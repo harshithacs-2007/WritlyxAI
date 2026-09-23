@@ -34,12 +34,25 @@ def create_style(
     return style
 
 
-def revoke_style(db: Session, *, user_id: str, style_id: str) -> Style:
+def revoke_style(
+    db: Session,
+    *,
+    user_id: str,
+    session_id: str,
+    style_id: str,
+) -> Style:
+    require_active_session(db, user_id, session_id)
+
     style = db.get(Style, style_id)
     if style is None or style.user_id != user_id:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Style not found",
+        )
+    if style.session_id != session_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Style does not belong to this session",
         )
 
     style.status = StyleStatus.REVOKED.value
