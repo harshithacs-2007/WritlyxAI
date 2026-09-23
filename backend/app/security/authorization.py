@@ -3,7 +3,7 @@ from datetime import datetime, timedelta
 from uuid import uuid4
 
 from fastapi import HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
 from app.config import settings
@@ -126,7 +126,25 @@ def consume_authorization(
             detail="Model-version binding mismatch",
         )
 
-    auth.status = AuthorizationStatus.CONSUMED.value
-    auth.consumed_at = now
-    db.flush()
+    # Atomic state transition: only one concurrent request can move ACTIVE -> CONSUMED.
+    result = db.execute(
+        update(Authorization)
+        .where(
+            Authorization.id == authorization_id,
+            Authorization.status == AuthorizationStatus.ACTIVE.value,
+        )
+        .values(
+            status=AuthorizationStatus.CONSUMED.value,
+            consumed_at=now,
+        )
+    )
+    if result.rowcount != 1:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Authorization was already consumed or revoked",
+        )
+
+    db.commit()
+    db.refresh(auth)
     return auth
