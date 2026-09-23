@@ -30,7 +30,7 @@ Base.metadata.create_all(bind=engine)
 
 app = FastAPI(
     title="WritlynxAI Prototype Backend",
-    version="0.2.0",
+    version="0.2.1",
     description=(
         "Review II prototype control layer: session binding, style ownership, "
         "purpose/model/content binding, one-time authorization, revocation and provenance."
@@ -216,10 +216,7 @@ def generate_endpoint(
     )
 
 
-@app.get(
-    "/provenance/{generation_id}",
-    response_model=ProvenanceResponse,
-)
+@app.get("/provenance/{generation_id}", response_model=ProvenanceResponse)
 def provenance_endpoint(
     generation_id: str,
     user_id: str = Query(min_length=1, max_length=64),
@@ -258,10 +255,19 @@ def provenance_endpoint(
 @app.post("/revoke/{style_id}", response_model=StyleResponse)
 def revoke_style_endpoint(
     style_id: str,
-    user_id: str,
+    user_id: str = Query(min_length=1, max_length=64),
+    session_id: str = Query(min_length=1, max_length=64),
     db: Session = Depends(get_db),
 ):
+    require_active_session(db, user_id, session_id)
+
     style = revoke_style(db, user_id=user_id, style_id=style_id)
+    if style.session_id != session_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Style does not belong to this session",
+        )
+
     audit(
         db,
         "STYLE_REVOKED",
