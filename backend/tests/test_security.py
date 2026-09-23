@@ -136,7 +136,10 @@ def test_revoked_style_blocks_existing_authorization():
 
     revoke = client.post(
         f"/revoke/{style['style_id']}",
-        params={"user_id": "U400"},
+        params={
+            "user_id": "U400",
+            "session_id": session["session_id"],
+        },
     )
     assert revoke.status_code == 200
 
