@@ -1,31 +1,43 @@
 # WritLynxAI frontend
 
-A product-oriented Next.js prototype for two handwriting workflows, with a persistent Light/Dark theme and reduced-motion-aware scroll interactions.
+A product-oriented Next.js prototype for personalized handwriting generation and English handwritten text recognition, with a persistent Light/Dark theme and reduced-motion-aware scroll interactions.
 
 ## Product routes
 
-- `/` — concise product landing page with a live editable text/paper preview. Continue in the studio to carry the preview text into the generation workspace.
-- `/studio` — handwriting sample intake, text entry, an illustrative paper preview, and the existing FastAPI authorization/provenance flow when `NEXT_PUBLIC_API_BASE_URL` is configured.
-- `/recognize` — local source-image preview, editable manual transcript, and text-file download.
+- `/` — interactive text/paper preview and direct links to the main tools. The preview is illustrative, not produced by a neural generation model.
+- `/studio` — handwriting sample intake, text entry, illustrative paper preview, and the existing FastAPI authorization/provenance path.
+- `/recognize` — upload a handwritten English image, call the backend TrOCR endpoint, edit/correct the transcript, download text, and reopen recent jobs saved in SQLite.
 
 ## Run locally
 
-From this directory, install dependencies, copy `.env.example` to `.env.local`, then run:
+From the repository root, start the backend in one PowerShell terminal:
 
-```bash
+```powershell
+cd backend
+py -m venv .venv
+.\.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+Copy-Item .env.example .env
+py download_htr_model.py
+uvicorn app.main:app --reload
+```
+
+Then, in a second PowerShell terminal from the repository root:
+
+```powershell
+cd frontend
 npm install
+Copy-Item .env.example .env.local
 npm run dev
 ```
 
-Open http://localhost:3000.
-
-To connect the FastAPI control layer, set `NEXT_PUBLIC_API_BASE_URL` in `.env.local`, normally to `http://127.0.0.1:8000`.
+Open http://localhost:3000. The frontend example points to `http://127.0.0.1:8000`. Run the model download once per backend machine/cache. It fetches about 1.33 GB of weights plus tokenizer/processor files and needs network access.
 
 ## Prototype boundaries
 
-- The landing-page paper is a live UI preview, not model-generated handwriting.
-- The generation workspace uses deterministic browser-side visual styling. It is not a trained handwriting-synthesis model and does not extract a real style embedding.
-- When the API URL is configured, generation requests preserve the existing session, style record, authorization, one-time consumption, and provenance endpoint sequence. If the backend request fails, the UI reports the error instead of silently falling back to local mode.
-- The recognition page does not perform OCR or HTR yet. Uploaded images remain in the browser; the transcript can be edited manually and downloaded as a text file.
-- The security backend remains a prototype control layer, not production authentication infrastructure.
-- Landing-page motion uses the existing Framer Motion dependency; scroll-linked movement is disabled or reduced for users who prefer reduced motion.
+- The landing-page paper and generation output are illustrative browser-side previews, not model-generated handwriting.
+- The Generation route still preserves its existing session/style/authorization/provenance flow. Personal handwriting generation needs a separate trained generation pipeline; TrOCR cannot generate a handwriting style.
+- The Recognition route uses a pretrained TrOCR model fine-tuned for English handwriting on IAM. Its lightweight line segmentation is best with clear, single-column pages. Low-quality, slanted, dense, or unusual writing may produce incorrect text; review every output.
+- The Recognition API stores transcript, image SHA-256, model ID, filename and run status in the existing SQLite database. It does not store the original source image.
+- The demo user/session flow is not production authentication. Do not use sensitive pages or deploy it publicly with this demo identity.
+- Landing-page scroll motion uses Framer Motion and is reduced for users who prefer reduced motion.
