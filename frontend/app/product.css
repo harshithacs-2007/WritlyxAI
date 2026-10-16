@@ -215,3 +215,12 @@
   .recognition-history-head { align-items: start; flex-direction: column; gap: 8px; }
   .recognition-history-item { align-items: start; }
 }
+
+
+.sample-storage-note {
+  margin: 10px 0 0;
+  color: var(--muted-dim);
+  font-size: 8px;
+  line-height: 1.75;
+}
+:root[data-theme="light"] .sample-storage-note { color: #6d6b62; }
