@@ -185,13 +185,13 @@ export default function StudioPage() {
     try {
       const session = await ensureBackendSession();
       if (API_BASE && session) {
-        const styleResponse = await postJSON<{ style_id: string }>("/styles", {
+        const backendStyleId = style.backendStyleId ?? (await postJSON<{ style_id: string }>("/styles", {
           user_id: userId.trim(), session_id: session,
           parameters: { seed: style.seed, sample_count: style.sampleCount, source_size: style.size },
           representation_version: "prototype-v1",
-        });
+        })).style_id;
         const authorization = await postJSON<{ authorization_id: string }>("/authorize", {
-          user_id: userId.trim(), session_id: session, style_id: styleResponse.style_id,
+          user_id: userId.trim(), session_id: session, style_id: backendStyleId,
           purpose: "prototype-generation", model_version: "prototype-renderer-v1", content: text.trim(),
         });
         setStatus("Consuming one-time authorization");
@@ -213,7 +213,25 @@ export default function StudioPage() {
     } finally { setIsGenerating(false); }
   };
 
-  const resetSample = () => { setFile(null); setStyle(null); setResult(null); setError(""); setStatus("Ready for a sample"); };
+  const resetSample = async () => {
+    const savedStyle = style;
+    if (API_BASE && savedStyle?.backendStyleId && sessionId) {
+      const params = new URLSearchParams({ user_id: userId.trim(), session_id: sessionId });
+      try {
+        await Promise.all((savedStyle.sampleIds ?? []).map((sampleId) =>
+          fetch(API_BASE + "/styles/" + encodeURIComponent(savedStyle.backendStyleId!) + "/samples/" + encodeURIComponent(sampleId) + "?" + params.toString(), { method: "DELETE" })
+        ));
+        await fetch(API_BASE + "/revoke/" + encodeURIComponent(savedStyle.backendStyleId) + "?" + params.toString(), { method: "POST" });
+      } catch {
+        setError("Local preview cleared, but the backend may still retain a reference. Check the API connection if deletion matters.");
+      }
+    }
+    setFiles([]);
+    setStyle(null);
+    setResult(null);
+    setError("");
+    setStatus("Ready for a sample");
+  };
 
   return (
     <main className="workspace-shell">
