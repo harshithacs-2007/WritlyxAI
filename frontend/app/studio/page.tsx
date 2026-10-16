@@ -44,6 +44,11 @@ export default function StudioPage() {
   const [error, setError] = useState("");
 
   useEffect(() => {
+    const initialText = new URLSearchParams(window.location.search).get("text");
+    if (initialText) setText(initialText.slice(0, 5000));
+  }, []);
+
+  useEffect(() => {
     if (!file || !file.type.startsWith("image/")) { setSamplePreview(""); return; }
     const objectUrl = URL.createObjectURL(file);
     setSamplePreview(objectUrl);
