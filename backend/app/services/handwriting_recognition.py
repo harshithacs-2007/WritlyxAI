@@ -7,11 +7,12 @@ startup so the rest of the prototype remains usable while the cache is cold.
 from __future__ import annotations
 
 import io
-import os
 import threading
 from typing import Any
 
-MODEL_ID = os.getenv("WRITLYNX_HTR_MODEL_ID", "microsoft/trocr-base-handwritten")
+from app.config import settings
+
+MODEL_ID = settings.htr_model_id
 MAX_IMAGE_PIXELS = 12_000_000
 MAX_LINES_PER_PAGE = 40
 
