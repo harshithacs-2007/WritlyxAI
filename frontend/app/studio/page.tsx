@@ -8,7 +8,7 @@ import { ThemeToggle } from "../theme";
 
 type Mode = "mock" | "backend";
 type StyleMeta = { styleId: string; backendStyleId?: string; sampleIds?: string[]; seed: number; fileName: string; size: number; sampleCount: number };
-type Result = { generationId: string; fingerprint: string; provenanceDigest: string; mode: Mode };
+type Result = { generationId: string; fingerprint: string; provenanceDigest: string; mode: Mode; imageUrl?: string; modelId?: string; wordsGenerated?: number; referenceWordsUsed?: number };
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, "");
 
 async function sha256(text: string) {
@@ -63,6 +63,8 @@ export default function StudioPage() {
     setSamplePreview(objectUrl);
     return () => URL.revokeObjectURL(objectUrl);
   }, [files]);
+
+  const wordCount = useMemo(() => text.trim().split(/\\s+/).filter(Boolean).length, [text]);
 
   const lines = useMemo(() => {
     const words = text.trim().split(/\s+/).filter(Boolean).slice(0, 48);
@@ -180,10 +182,11 @@ export default function StudioPage() {
   const generate = async () => {
     if (!style) { setError("Save at least one handwriting reference before generating a preview."); return; }
     if (!text.trim()) { setError("Enter the text you want to preview."); return; }
+    if (API_BASE && wordCount > 48) { setError("The current handwriting model supports up to 48 words per page. Shorten the text and retry."); return; }
     if (!userId.trim()) { setError("Enter a prototype user ID."); return; }
     setError("");
     setIsGenerating(true);
-    setStatus(API_BASE ? "Checking backend authorization" : "Preparing local visual simulation");
+    setStatus(API_BASE ? "Preparing the handwriting model" : "Preparing local visual simulation");
     const contentHash = await sha256(text.trim());
     try {
       const session = await ensureBackendSession();
@@ -191,19 +194,29 @@ export default function StudioPage() {
         const backendStyleId = style.backendStyleId ?? (await postJSON<{ style_id: string }>("/styles", {
           user_id: userId.trim(), session_id: session,
           parameters: { seed: style.seed, sample_count: style.sampleCount, source_size: style.size },
-          representation_version: "prototype-v1",
+          representation_version: "diffusionpen-five-shot-v1",
         })).style_id;
         const authorization = await postJSON<{ authorization_id: string }>("/authorize", {
           user_id: userId.trim(), session_id: session, style_id: backendStyleId,
-          purpose: "prototype-generation", model_version: "prototype-renderer-v1", content: text.trim(),
+          purpose: "prototype-generation", model_version: "diffusionpen-iam-v1", content: text.trim(),
         });
         setStatus("Consuming one-time authorization");
-        const generation = await postJSON<{ generation_id: string; provenance_digest: string }>("/generate", {
+        const generation = await postJSON<{ generation_id: string; provenance_digest: string; image_url: string; model_id: string; words_generated: number; reference_words_used: number }>("/generate", {
           user_id: userId.trim(), session_id: session, authorization_id: authorization.authorization_id,
-          content: text.trim(), purpose: "prototype-generation", model_version: "prototype-renderer-v1",
+          content: text.trim(), purpose: "prototype-generation", model_version: "diffusionpen-iam-v1",
         });
-        setResult({ generationId: generation.generation_id, fingerprint: contentHash, provenanceDigest: generation.provenance_digest, mode: "backend" });
-        setStatus("Authorization consumed · provenance recorded");
+        const imageQuery = new URLSearchParams({ user_id: userId.trim(), session_id: session });
+        setResult({
+          generationId: generation.generation_id,
+          fingerprint: contentHash,
+          provenanceDigest: generation.provenance_digest,
+          mode: "backend",
+          imageUrl: API_BASE + generation.image_url + "?" + imageQuery.toString(),
+          modelId: generation.model_id,
+          wordsGenerated: generation.words_generated,
+          referenceWordsUsed: generation.reference_words_used,
+        });
+        setStatus("DiffusionPen generation complete · provenance recorded");
       } else {
         await new Promise((resolve) => setTimeout(resolve, 520));
         const pseudo = await sha256(style.styleId + ":" + contentHash + ":" + style.seed);
@@ -214,6 +227,34 @@ export default function StudioPage() {
       setError(caught instanceof Error ? caught.message : "Generation failed.");
       setStatus("Request blocked");
     } finally { setIsGenerating(false); }
+  };
+
+  const downloadPreview = async () => {
+    if (result?.mode === "backend" && result.imageUrl) {
+      try {
+        const response = await fetch(result.imageUrl);
+        if (!response.ok) throw new Error("The generated image could not be downloaded.");
+        const blob = await response.blob();
+        const objectUrl = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = objectUrl;
+        link.download = "writlynxai-handwriting.png";
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1500);
+      } catch (caught) {
+        setError(caught instanceof Error ? caught.message : "Could not download the image.");
+      }
+      return;
+    }
+
+    const link = document.createElement("a");
+    link.href = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svgPreview);
+    link.download = "writlynxai-preview.svg";
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
   };
 
   const resetSample = async () => {
