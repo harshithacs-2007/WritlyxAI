@@ -8,7 +8,7 @@ FastAPI + SQLite prototype for generation authorization/provenance and English h
 - Style ownership, purpose/model/content binding, one-time authorization, revocation, and generation provenance.
 - English handwriting recognition through Microsoft's pretrained TrOCR base model.
 - SQLite records for recognition jobs, transcripts, file checksums, model ID, status, and line count.
-- The original image is processed in memory and **is not stored** in SQLite or written to a permanent upload directory.
+- Recognition uploads are processed in memory and **are not stored**. Style-reference images explicitly uploaded through the Generation workspace **are stored as SQLite BLOBs** (up to five images, 8 MB each) so a future style-conditioned generator can use them.
 
 ## API
 
@@ -17,12 +17,17 @@ FastAPI + SQLite prototype for generation authorization/provenance and English h
 | GET | /health | Backend health check |
 | POST | /sessions | Create prototype session |
 | POST | /styles | Create a style representation record |
+| POST | /styles/{style_id}/samples | Store 1–5 writing-reference images for future style generation |
+| GET | /styles/{style_id}/samples | List saved reference-image metadata for the active session |
+| DELETE | /styles/{style_id}/samples/{sample_id} | Delete a saved reference image |
 | POST | /authorize | Issue purpose/model/content-bound authorization |
 | POST | /generate | Consume authorization and create generation provenance |
 | GET | /provenance/{generation_id} | Retrieve provenance for the owning session |
 | POST | /revoke/{style_id} | Revoke a style and active authorizations |
 | POST | /recognize | Recognize English handwriting from a PNG/JPEG/WEBP image |
 | GET | /recognitions | List recent recognition jobs belonging to an active session |
+
+The style-reference endpoint accepts multipart fields files (1–5), user_id, and session_id. It stores validated PNG/JPEG/WEBP image bytes and a SHA-256 digest; the user can delete saved references from the Generation workspace. The generation model is not connected yet, so persisted style samples are groundwork for the next step.
 
 The recognition endpoint accepts multipart form fields file, user_id, and session_id. It returns an editable transcript, model identifier, SHA-256 of the input image, number of processed lines, and the persisted job ID. Recent results can be listed with user_id and session_id query parameters. Swagger UI is available at /docs.
 
@@ -49,7 +54,7 @@ The configured default is microsoft/trocr-base-handwritten, an MIT-licensed mode
 
 ## Database behaviour
 
-The project already uses SQLAlchemy with SQLite. The recognition_jobs table is created alongside the existing tables on backend startup. It stores the filename, image SHA-256, transcript, model ID, job status and line count. **The source image itself is not retained.** Database path defaults to ./writlynxai.db relative to the backend process working directory.
+The project already uses SQLAlchemy with SQLite. The recognition_jobs table stores the recognition filename, image SHA-256, transcript, model ID, job status and line count; **recognition source images are not retained**. The style_samples table stores up to five explicitly selected Generation reference images per style, with filename, MIME type, digest, and bytes. The user can delete these image rows. Database path defaults to ./writlynxai.db relative to the backend process working directory.
 
 ## Review II security controls
 
