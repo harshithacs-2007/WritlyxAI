@@ -1,8 +1,10 @@
-"""Download the configured pretrained English handwriting model into the HF cache.
+"""Pre-download the configured pretrained English handwriting model into HF cache.
 
-Run from the backend directory after installing requirements:
+Run once from the backend directory:
     py download_htr_model.py
-This intentionally does not place large model weights in the Git repository.
+
+Download the safetensors checkpoint and processor/tokenizer metadata only; do not
+download the duplicate PyTorch .bin checkpoint or add large weights to Git.
 """
 from huggingface_hub import snapshot_download
 
@@ -11,8 +13,22 @@ from app.config import settings
 
 def main() -> None:
     print(f"Downloading model assets for: {settings.htr_model_id}")
-    print("The TrOCR base checkpoint is about 1.33 GB; ensure disk space and network access.")
-    snapshot_path = snapshot_download(repo_id=settings.htr_model_id)
+    print("The safetensors checkpoint is about 1.33 GB. Ensure disk space and network access.")
+    print("Only the safe-tensors weights and required JSON/text processor files will be cached.")
+    snapshot_path = snapshot_download(
+        repo_id=settings.htr_model_id,
+        allow_patterns=[
+            "config.json",
+            "generation_config.json",
+            "model.safetensors",
+            "preprocessor_config.json",
+            "special_tokens_map.json",
+            "tokenizer_config.json",
+            "tokenizer.json",
+            "vocab.json",
+            "merges.txt",
+        ],
+    )
     print(f"Model cache ready: {snapshot_path}")
     print("You can now start the API; recognition will reuse the cached files.")
 
