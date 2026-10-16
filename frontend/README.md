@@ -5,7 +5,7 @@ A product-oriented Next.js prototype for personalized handwriting generation and
 ## Product routes
 
 - `/` — interactive text/paper preview and direct links to the main tools. The preview is illustrative, not produced by a neural generation model.
-- `/studio` — handwriting sample intake, text entry, illustrative paper preview, and the existing FastAPI authorization/provenance path.
+- `/studio` — select up to five style-reference images, store them in SQLite when the backend is enabled, enter text, and inspect the illustrative paper preview plus the existing FastAPI authorization/provenance flow. The actual style-generation model is not connected yet.
 - `/recognize` — upload a handwritten English image, call the backend TrOCR endpoint, edit/correct the transcript, download text, and reopen recent jobs saved in SQLite.
 
 ## Run locally
@@ -38,6 +38,6 @@ Open http://localhost:3000. The frontend example points to `http://127.0.0.1:800
 - The landing-page paper and generation output are illustrative browser-side previews, not model-generated handwriting.
 - The Generation route still preserves its existing session/style/authorization/provenance flow. Personal handwriting generation needs a separate trained generation pipeline; TrOCR cannot generate a handwriting style.
 - The Recognition route uses a pretrained TrOCR model fine-tuned for English handwriting on IAM. Its lightweight line segmentation is best with clear, single-column pages. Low-quality, slanted, dense, or unusual writing may produce incorrect text; review every output.
-- The Recognition API stores transcript, image SHA-256, model ID, filename and run status in the existing SQLite database. It does not store the original source image.
+- The Recognition API stores transcript, image SHA-256, model ID, filename and run status in the existing SQLite database, but not the original recognition image. Style-reference images selected in Generation are stored in SQLite until explicitly deleted.
 - The demo user/session flow is not production authentication. Do not use sensitive pages or deploy it publicly with this demo identity.
 - Landing-page scroll motion uses Framer Motion and is reduced for users who prefer reduced motion.
