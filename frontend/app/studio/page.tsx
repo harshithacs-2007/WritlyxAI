@@ -29,6 +29,13 @@ function seededValue(seed: number, index: number) {
   return x - Math.floor(x);
 }
 
+function escapeXml(value: string) {
+  const entities: Record<string, string> = {
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&apos;",
+  };
+  return value.replace(/[&<>"']/g, (character) => entities[character]);
+}
+
 export default function StudioPage() {
   const reduceMotion = useReducedMotion();
   const [file, setFile] = useState<File | null>(null);
@@ -61,6 +68,22 @@ export default function StudioPage() {
     for (let i = 0; i < words.length; i += 5) rows.push(words.slice(i, i + 5));
     return rows.length ? rows : [["Your", "words", "will", "appear", "here."]];
   }, [text]);
+
+  const svgPreview = useMemo(() => {
+    const rows = lines.map((row) => row.join(" "));
+    const height = Math.max(430, 185 + rows.length * 43);
+    const writing = rows.map((row, index) =>
+      `<tspan x="92" dy="${index === 0 ? 0 : 43}">${escapeXml(row)}</tspan>`
+    ).join("");
+    return `<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="${height}" viewBox="0 0 1000 ${height}">
+      <defs><pattern id="paper-lines" width="1000" height="43" patternUnits="userSpaceOnUse"><path d="M0 42.5H1000" stroke="#d9cdb8" stroke-width="1"/></pattern></defs>
+      <rect width="1000" height="${height}" fill="#f0e7d5"/>
+      <rect width="1000" height="${height}" fill="url(#paper-lines)"/>
+      <text x="92" y="48" font-family="Arial,sans-serif" font-size="12" letter-spacing="2.2" fill="#8e836f">WRTLYNXAI / ILLUSTRATIVE PREVIEW</text>
+      <text x="92" y="105" font-family="Segoe Print,Bradley Hand,Comic Sans MS,cursive" font-size="31" fill="#282720">${writing}</text>
+      <text x="92" y="${height - 28}" font-family="Arial,sans-serif" font-size="11" letter-spacing="2" fill="#8e836f">SIMULATED PREVIEW · NOT AI-GENERATED</text>
+    </svg>`;
+  }, [lines]);
 
   const handleUpload = async (event: ChangeEvent<HTMLInputElement>) => {
     const selected = event.target.files?.[0];
@@ -149,9 +172,9 @@ export default function StudioPage() {
         <aside className="studio-sidebar">
           <div className="panel-section-head"><span>01</span><div><h2>Capture a style</h2><p>Choose a clear photo of handwriting.</p></div></div>
           <label className="upload-zone">
-            <input type="file" accept="image/*,.pdf" onChange={handleUpload} aria-label="Upload a handwriting sample" />
+            <input type="file" accept="image/*" onChange={handleUpload} aria-label="Upload a handwriting sample" />
             {samplePreview ? <Image src={samplePreview} alt="Preview of uploaded handwriting sample" width={1200} height={800} unoptimized className="upload-preview" /> : <span className="upload-symbol">↑</span>}
-            <strong>{file ? file.name : "Drop your writing here"}</strong><small>{file ? "Sample metadata loaded" : "Browse files · PNG, JPG or PDF"}</small>{file && <span className="upload-replace">Choose another ↗</span>}
+            <strong>{file ? file.name : "Drop your writing here"}</strong><small>{file ? "Sample metadata loaded" : "Browse files · PNG, JPG or WEBP"}</small>{file && <span className="upload-replace">Choose another ↗</span>}
           </label>
           {isAnalyzing && <motion.div className="inline-progress" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}><span className="progress-sweep" /><div><small>LOCAL PREVIEW</small><strong>Preparing file details…</strong></div></motion.div>}
           {style && !isAnalyzing && <motion.div className="sample-record" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
@@ -182,6 +205,18 @@ export default function StudioPage() {
               </motion.div>
             )}
           </div>
+          {result && (
+            <div className="preview-export-row">
+              <a
+                className="preview-export-link"
+                href={"data:image/svg+xml;charset=utf-8," + encodeURIComponent(svgPreview)}
+                download="writlynxai-preview.svg"
+              >
+                Download preview <span aria-hidden="true">↓</span>
+              </a>
+              <span>SVG · illustrative browser-rendered output</span>
+            </div>
+          )}
           <div className="provenance-card">
             <div className="provenance-title"><div><p className="eyebrow">03 / PROVENANCE</p><h3>Request record</h3></div><span className="integrity-tag">SHA-256 <i>✓</i></span></div>
             <div className="provenance-grid"><div><span>GENERATION ID</span><b>{result?.generationId ?? "Waiting for request"}</b></div><div><span>STYLE REFERENCE</span><b>{style?.styleId ?? "No sample"}</b></div><div><span>CONTENT FINGERPRINT</span><b>{result ? result.fingerprint.slice(0, 18) + "…" : "—"}</b></div><div><span>PROVENANCE DIGEST</span><b>{result ? result.provenanceDigest.slice(0, 18) + "…" : "—"}</b></div></div>
