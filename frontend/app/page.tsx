@@ -26,7 +26,7 @@ export default function Home() {
 
   return (
     <main className="product-home">
-      <motion.div className="product-scroll-progress" style={{ scaleX: scrollYProgress }} />
+      <motion.div className="product-scroll-progress" style={{ scaleX: reduceMotion ? 0 : scrollYProgress }} />
       <header className="product-topbar wrap">
         <Link className="wordmark" href="/" aria-label="WritLynxAI home">
           <span className="wordmark-symbol">w<span>.</span></span>
@@ -92,7 +92,7 @@ export default function Home() {
           <div className="product-kicker"><span /> YOUR WORKSPACE</div>
           <h2>Start with what<br />you need to do.</h2>
           <p>No complicated setup. Choose a task to open its workspace and continue from there.</p>
-          <div className="product-tools-progress" aria-hidden="true"><motion.span style={{ scaleY: toolProgress }} /></div>
+          <div className="product-tools-progress" aria-hidden="true"><motion.span style={{ scaleY: reduceMotion ? 0 : toolProgress }} /></div>
         </div>
 
         <div className="product-tool-list">
@@ -112,12 +112,6 @@ export default function Home() {
             <Link className="product-tool-link" href="/recognize">Open recognition workspace <span aria-hidden="true">↗</span></Link>
           </motion.article>
         </div>
-      </section>
-
-      <section className="product-bottom wrap">
-        <div className="product-bottom-mark" aria-hidden="true">w.</div>
-        <div><h2>Made for the page in front of you.</h2><p>Use the current prototype to explore the workflow. Model-powered handwriting generation and automatic recognition remain future integration steps.</p></div>
-        <Link className="product-bottom-link" href="/studio">Go to studio ↗</Link>
       </section>
 
       <footer className="product-footer wrap">
