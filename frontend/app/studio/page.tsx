@@ -4,6 +4,7 @@ import { ChangeEvent, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { motion, useReducedMotion } from "framer-motion";
+import { ThemeToggle } from "../theme";
 
 type Mode = "mock" | "backend";
 type StyleMeta = { styleId: string; seed: number; fileName: string; size: number; sampleCount: number };
@@ -126,6 +127,7 @@ export default function StudioPage() {
       <header className="workspace-nav wrap">
         <Link className="wordmark" href="/" aria-label="WritLynxAI home"><span className="wordmark-symbol">w<span>.</span></span><span>WritLynx<span className="wordmark-ai">AI</span></span></Link>
         <nav className="workspace-tabs" aria-label="Workspaces"><Link className="workspace-tab active" href="/studio">Generation</Link><Link className="workspace-tab" href="/recognize">Recognition <span className="tab-new">BETA</span></Link></nav>
+        <ThemeToggle />
         <Link className="workspace-exit" href="/">Back to overview <span>↗</span></Link>
       </header>
 
