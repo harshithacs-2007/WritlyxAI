@@ -99,7 +99,7 @@ def recognize_endpoint(
     """Run English TrOCR on a handwriting page and store transcript metadata only."""
     try:
         require_active_session(db, user_id, session_id)
-        if not file.content_type or not file.content_type.lower().startswith("image/"):
+        if (file.content_type or "").lower() not in {"image/png", "image/jpeg", "image/webp"}:
             raise HTTPException(
                 status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
                 detail="Upload a PNG, JPEG, or WEBP image.",
