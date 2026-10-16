@@ -12,7 +12,7 @@ from typing import Any
 
 from app.config import settings
 
-MODEL_ID = settings.htr_model_id
+MODEL_ID = settings.htr_model_path.strip() or settings.htr_model_id
 MAX_IMAGE_PIXELS = 12_000_000
 MAX_LINES_PER_PAGE = 40
 
@@ -43,8 +43,15 @@ def _load_model() -> tuple[Any, Any, Any]:
             import torch
             from transformers import TrOCRProcessor, VisionEncoderDecoderModel
 
-            processor = TrOCRProcessor.from_pretrained(MODEL_ID)
-            model = VisionEncoderDecoderModel.from_pretrained(MODEL_ID)
+            from pathlib import Path
+
+            local_model = Path(MODEL_ID).is_dir()
+            processor = TrOCRProcessor.from_pretrained(
+                MODEL_ID, local_files_only=local_model
+            )
+            model = VisionEncoderDecoderModel.from_pretrained(
+                MODEL_ID, local_files_only=local_model
+            )
             device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
             model.to(device)
             model.eval()
