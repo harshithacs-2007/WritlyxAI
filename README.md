@@ -39,13 +39,13 @@ Open http://localhost:3000. The frontend's local environment example points to h
 
 ## Model and storage considerations
 
-The HTR model is microsoft/trocr-base-handwritten, MIT-licensed and fine-tuned on IAM. Its safetensors checkpoint is about 1.33 GB. Run `py download_htr_model.py` to cache it and only the required tokenizer/processor files (weights remain outside Git). First run needs network and disk space; CPU inference may be slow. TrOCR is designed for single text-line input; the prototype performs simple line segmentation and is best with clear, single-column English handwriting. Review every transcript.
+The current recognition API uses microsoft/trocr-base-handwritten, MIT-licensed and fine-tuned on IAM. Its safetensors checkpoint is about 1.33 GB. Set WRITLYNX_HTR_MODEL_PATH in backend/.env to a folder such as C:/WritLynxAI-data/TrOCR if you prefer to save the model there, then run `py download_htr_model.py`. First run needs network and disk space; CPU inference may be slow. TrOCR is designed for single text-line input; the prototype performs simple line segmentation and is best with clear, single-column English handwriting. Review every transcript.
 
 The SQLite database already used by the project adds recognition_jobs and style_samples tables. Recognition jobs store transcript text, image checksum, filename, model ID, line count and status but not the raw recognition page; the style_samples table retains images explicitly selected as Generation references, until the user removes them. Configure WRITLYNX_DATABASE_URL to move the database file.
 
 ## Prototype boundaries
 
-- English recognition is a pretrained baseline, not a new model trained by this team.
+- English recognition is a pretrained baseline, not a new model trained by this team. The current recognition endpoint is English-only; broader Indic handwriting requires a compatible multilingual Indic model adapter and script-specific tests. Candidate model sources are documented in backend/README.md.
 - Automatic handwriting generation and real writer-style extraction are not integrated yet.
 - The generation page's visual output is not AI-generated.
 - The FastAPI service and user ID flow are prototype controls, not production authentication infrastructure.
