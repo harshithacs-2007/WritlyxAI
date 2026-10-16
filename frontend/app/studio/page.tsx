@@ -175,7 +175,7 @@ export default function StudioPage() {
   };
 
   const generate = async () => {
-    if (!style) { setError("Upload a handwriting sample before generating a preview."); return; }
+    if (!style) { setError("Save at least one handwriting reference before generating a preview."); return; }
     if (!text.trim()) { setError("Enter the text you want to preview."); return; }
     if (!userId.trim()) { setError("Enter a prototype user ID."); return; }
     setError("");
@@ -248,22 +248,25 @@ export default function StudioPage() {
           <h1>Give your words<br /><em>a human hand.</em></h1>
           <p>Load a handwriting sample, enter your text, and inspect the generation flow. Style encoding and the trained handwriting model are not yet connected.</p>
         </motion.div>
-        <div className="workspace-heading-aside"><div className="status-line"><span className="status-orb" /> {API_BASE ? "Backend configured" : "Local prototype mode"}</div><div className="heading-aside-note">No uploaded file is sent to a model in this prototype renderer.</div></div>
+        <div className="workspace-heading-aside"><div className="status-line"><span className="status-orb" /> {API_BASE ? "Backend configured" : "Local prototype mode"}</div><div className="heading-aside-note">Saved references are stored for future style-model integration; the current renderer does not learn from them.</div></div>
       </section>
 
       <section className="studio-layout wrap">
         <aside className="studio-sidebar">
-          <div className="panel-section-head"><span>01</span><div><h2>Capture a style</h2><p>Choose a clear photo of handwriting.</p></div></div>
+          <div className="panel-section-head"><span>01</span><div><h2>Save handwriting samples</h2><p>Choose 1–5 images from the same writer for a future style model.</p></div></div>
           <label className="upload-zone">
-            <input type="file" accept="image/*" onChange={handleUpload} aria-label="Upload a handwriting sample" />
-            {samplePreview ? <Image src={samplePreview} alt="Preview of uploaded handwriting sample" width={1200} height={800} unoptimized className="upload-preview" /> : <span className="upload-symbol">↑</span>}
-            <strong>{file ? file.name : "Drop your writing here"}</strong><small>{file ? "Sample metadata loaded" : "Browse files · PNG, JPG or WEBP"}</small>{file && <span className="upload-replace">Choose another ↗</span>}
+            <input type="file" accept="image/png,image/jpeg,image/webp" multiple onChange={handleUpload} aria-label="Upload up to five handwriting reference images" />
+            {samplePreview ? <Image src={samplePreview} alt="Preview of the first uploaded handwriting sample" width={1200} height={800} unoptimized className="upload-preview" /> : <span className="upload-symbol">↑</span>}
+            <strong>{files.length ? files[0].name + (files.length > 1 ? " +" + (files.length - 1) + " more" : "") : "Choose handwriting images"}</strong>
+            <small>{files.length ? files.length + " reference " + (files.length === 1 ? "image" : "images") + " selected" : "PNG, JPEG, WEBP · up to five · max 8 MB each"}</small>
+            {files.length > 0 && <span className="upload-replace">Choose another set ↗</span>}
           </label>
-          {isAnalyzing && <motion.div className="inline-progress" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}><span className="progress-sweep" /><div><small>LOCAL PREVIEW</small><strong>Preparing file details…</strong></div></motion.div>}
+          {isAnalyzing && <motion.div className="inline-progress" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}><span className="progress-sweep" /><div><small>{API_BASE ? "SAVE TO SQLITE" : "LOCAL PREVIEW"}</small><strong>Preparing reference images…</strong></div></motion.div>}
           {style && !isAnalyzing && <motion.div className="sample-record" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
-            <div className="sample-record-top"><span className="small-label">SAMPLE REFERENCE</span><span className="sample-state">LOADED</span></div><b>{style.styleId}</b>
-            <div className="sample-meta"><span>File size</span><strong>{(style.size / 1024).toFixed(1)} KB</strong><span>Style encoder</span><strong>Not connected</strong></div>
-            <button className="text-button" onClick={resetSample} type="button">Remove sample <span>×</span></button>
+            <div className="sample-record-top"><span className="small-label">STYLE REFERENCE</span><span className="sample-state">{style.backendStyleId ? "SAVED" : "LOCAL ONLY"}</span></div><b>{style.styleId}</b>
+            <div className="sample-meta"><span>Reference images</span><strong>{style.sampleCount} / 5</strong><span>Total file size</span><strong>{(style.size / 1024).toFixed(1)} KB</strong></div>
+            <p className="sample-storage-note">{style.backendStyleId ? "Image samples and checksums are stored in SQLite for this demo session." : "Images are only in this browser. Configure the backend to save them."} The style-generation model is not connected yet.</p>
+            <button className="text-button" onClick={resetSample} type="button">Delete saved references <span>×</span></button>
           </motion.div>}
           <div className="sidebar-divider" />
           <div className="panel-section-head"><span>02</span><div><h2>Write your text</h2><p>Content is hashed before the request flow.</p></div></div>
