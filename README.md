@@ -31,7 +31,8 @@ Open http://localhost:3000. The frontend's local environment example points to h
 
 ## Current functionality
 
-- **English recognition:** uploads a PNG/JPEG/WEBP page to the FastAPI endpoint, runs the pretrained TrOCR model, returns an editable transcript, and stores a recognition job/checksum/transcript in the existing SQLite database. The original source image is not retained.
+- **English recognition:** uploads a PNG/JPEG/WEBP page to the FastAPI endpoint, runs the pretrained TrOCR model, returns an editable transcript, and stores a recognition job/checksum/transcript in SQLite. The recognition source image is not retained.
+- **Style reference storage:** the Generation workspace can store up to five user-selected handwriting reference images (8 MB each) in SQLite, scoped to a demo user/session/style. These saved samples prepare for future style-conditioned generation; the generator is not integrated yet.
 - **Recognition history:** lists recent jobs belonging to the current prototype session so a transcript can be reopened and edited.
 - **Generation:** retains the existing session, style record, authorization, one-time-consumption and provenance flow. The current handwriting appearance is still browser-rendered visual simulation, not model-generated handwriting; a pretrained generation model is a separate integration task.
 - **Themes and motion:** Light/Dark preference persists across routes; scroll motion is reduced when a user prefers reduced motion.
@@ -40,7 +41,7 @@ Open http://localhost:3000. The frontend's local environment example points to h
 
 The HTR model is microsoft/trocr-base-handwritten, MIT-licensed and fine-tuned on IAM. Its safetensors checkpoint is about 1.33 GB. Run `py download_htr_model.py` to cache it and only the required tokenizer/processor files (weights remain outside Git). First run needs network and disk space; CPU inference may be slow. TrOCR is designed for single text-line input; the prototype performs simple line segmentation and is best with clear, single-column English handwriting. Review every transcript.
 
-The SQLite database already used by the project adds a recognition_jobs table. It stores transcript text, image checksum, filename, model ID, line count and status—not raw uploaded image bytes. Configure WRITLYNX_DATABASE_URL to move the database file.
+The SQLite database already used by the project adds recognition_jobs and style_samples tables. Recognition jobs store transcript text, image checksum, filename, model ID, line count and status but not the raw recognition page; the style_samples table retains images explicitly selected as Generation references, until the user removes them. Configure WRITLYNX_DATABASE_URL to move the database file.
 
 ## Prototype boundaries
 
