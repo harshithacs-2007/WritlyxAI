@@ -33,6 +33,7 @@ The recognition endpoint accepts multipart form fields file, user_id, and sessio
     .\.venv\Scripts\Activate.ps1
     pip install -r requirements.txt
     Copy-Item .env.example .env
+    py download_htr_model.py
     uvicorn app.main:app --reload
 
 The frontend expects NEXT_PUBLIC_API_BASE_URL=http://127.0.0.1:8000 in frontend/.env.local.
@@ -41,7 +42,7 @@ The frontend expects NEXT_PUBLIC_API_BASE_URL=http://127.0.0.1:8000 in frontend/
 
 The configured default is microsoft/trocr-base-handwritten, an MIT-licensed model fine-tuned on IAM. TrOCR is intended for **single text-line images**, so this prototype segments a clear single-column page into line crops before inference. The segmentation is intentionally lightweight; columns, skew, tables, very dense pages, and unusual layouts can produce poor transcripts. Always review model output.
 
-- The model and tokenizer are downloaded from Hugging Face the first time /recognize is called, then cached in the normal Hugging Face cache; model weights are not committed to Git.
+- Run `py download_htr_model.py` to download the safetensors checkpoint (about 1.33 GB) plus the tokenizer/processor files into the normal Hugging Face cache. The service can also lazy-download the model on the first `/recognize` request. Model weights are not committed to Git.
 - The model checkpoint alone is about 1.33 GB, so allow extra disk space for the PyTorch runtime and cache. The first call requires network access; CPU inference works but can be slow.
 - WRITLYNX_HTR_MODEL_ID can select a compatible model via .env. Keep it compatible with the configured TrOCR loader and evaluate it before use.
 - Upload limit: 8 MB; decoded image limit: 12 megapixels; at most 40 detected text lines per image.
