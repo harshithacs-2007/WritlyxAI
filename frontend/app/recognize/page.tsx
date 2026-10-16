@@ -4,6 +4,7 @@ import { ChangeEvent, useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { motion, useReducedMotion } from "framer-motion";
+import { ThemeToggle } from "../theme";
 
 export default function RecognizePage() {
   const reduceMotion = useReducedMotion();
@@ -39,6 +40,7 @@ export default function RecognizePage() {
       <header className="workspace-nav wrap">
         <Link className="wordmark" href="/" aria-label="WritLynxAI home"><span className="wordmark-symbol">w<span>.</span></span><span>WritLynx<span className="wordmark-ai">AI</span></span></Link>
         <nav className="workspace-tabs" aria-label="Workspaces"><Link className="workspace-tab" href="/studio">Generation</Link><Link className="workspace-tab active" href="/recognize">Recognition <span className="tab-new">BETA</span></Link></nav>
+        <ThemeToggle />
         <Link className="workspace-exit" href="/">Back to overview <span>↗</span></Link>
       </header>
       <section className="workspace-heading recognition-heading wrap">
