@@ -3,6 +3,7 @@ import Script from "next/script";
 import { ThemeProvider } from "./theme";
 import "./globals.css";
 import "./theme.css";
+import "./product.css";
 
 export const metadata: Metadata = {
   title: "WritLynxAI — Handwriting, both ways",
