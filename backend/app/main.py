@@ -34,8 +34,9 @@ from app.services.handwriting_recognition import (
     recognize_english_page,
 )
 
-MAX_RECOGNITION_UPLOAD_BYTES = 8 * 1024 * 1024
 from app.services.style_service import create_style, revoke_style
+
+MAX_RECOGNITION_UPLOAD_BYTES = 8 * 1024 * 1024
 
 
 Base.metadata.create_all(bind=engine)
