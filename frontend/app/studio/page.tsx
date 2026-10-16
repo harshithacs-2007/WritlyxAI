@@ -48,6 +48,7 @@ export default function StudioPage() {
   const [result, setResult] = useState<Result | null>(null);
   const [userId, setUserId] = useState("demo-user");
   const [sessionId, setSessionId] = useState("");
+  const [sessionUserId, setSessionUserId] = useState("");
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -168,9 +169,11 @@ export default function StudioPage() {
 
   const ensureBackendSession = async () => {
     if (!API_BASE) return null;
-    if (sessionId) return sessionId;
-    const session = await postJSON<{ session_id: string }>("/sessions", { user_id: userId });
+    const normalizedUserId = userId.trim();
+    if (sessionId && sessionUserId === normalizedUserId) return sessionId;
+    const session = await postJSON<{ session_id: string }>("/sessions", { user_id: normalizedUserId });
     setSessionId(session.session_id);
+    setSessionUserId(normalizedUserId);
     return session.session_id;
   };
 
@@ -215,21 +218,24 @@ export default function StudioPage() {
 
   const resetSample = async () => {
     const savedStyle = style;
+    let deletionFailed = false;
     if (API_BASE && savedStyle?.backendStyleId && sessionId) {
       const params = new URLSearchParams({ user_id: userId.trim(), session_id: sessionId });
       try {
-        await Promise.all((savedStyle.sampleIds ?? []).map((sampleId) =>
+        const deletions = await Promise.all((savedStyle.sampleIds ?? []).map((sampleId) =>
           fetch(API_BASE + "/styles/" + encodeURIComponent(savedStyle.backendStyleId!) + "/samples/" + encodeURIComponent(sampleId) + "?" + params.toString(), { method: "DELETE" })
         ));
-        await fetch(API_BASE + "/revoke/" + encodeURIComponent(savedStyle.backendStyleId) + "?" + params.toString(), { method: "POST" });
+        if (deletions.some((response) => !response.ok)) throw new Error("Could not delete all saved reference images.");
+        const revokeResponse = await fetch(API_BASE + "/revoke/" + encodeURIComponent(savedStyle.backendStyleId) + "?" + params.toString(), { method: "POST" });
+        if (!revokeResponse.ok) throw new Error("Could not revoke the saved style reference.");
       } catch {
-        setError("Local preview cleared, but the backend may still retain a reference. Check the API connection if deletion matters.");
+        deletionFailed = true;
       }
     }
     setFiles([]);
     setStyle(null);
     setResult(null);
-    setError("");
+    setError(deletionFailed ? "The local preview was cleared, but the backend may still retain a reference. Check the backend connection if deletion matters." : "");
     setStatus("Ready for a sample");
   };
 
@@ -270,7 +276,7 @@ export default function StudioPage() {
           </motion.div>}
           <div className="sidebar-divider" />
           <div className="panel-section-head"><span>02</span><div><h2>Write your text</h2><p>Content is hashed before the request flow.</p></div></div>
-          <label className="field-label" htmlFor="prototype-user">Prototype user ID</label><input id="prototype-user" className="field-control" value={userId} maxLength={64} onChange={(event) => setUserId(event.target.value)} placeholder="demo-user" />
+          <label className="field-label" htmlFor="prototype-user">Prototype user ID</label><input id="prototype-user" className="field-control" disabled={Boolean(style?.backendStyleId)} value={userId} maxLength={64} onChange={(event) => setUserId(event.target.value)} placeholder="demo-user" />
           <label className="field-label field-label-spaced" htmlFor="generation-text">Your text <span>{text.length}/5000</span></label><textarea id="generation-text" className="field-control textarea-control" value={text} onChange={(event) => setText(event.target.value)} maxLength={5000} placeholder="Type the words you want to see…" />
           {error && <div className="feedback-error" role="alert">{error}</div>}
           <button className="button button-light generate-button" disabled={isGenerating} onClick={generate} type="button">{isGenerating ? <><span className="button-spinner" /> Working…</> : <>Create preview <span>↗</span></>}</button>
