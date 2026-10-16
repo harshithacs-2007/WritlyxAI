@@ -76,3 +76,25 @@ class ProvenanceResponse(BaseModel):
 
 class MessageResponse(BaseModel):
     message: str
+
+
+class RecognitionResponse(BaseModel):
+    job_id: str
+    status: str
+    original_filename: str
+    image_sha256: str
+    model_id: str
+    lines_recognized: int
+    transcript: str
+    created_at: datetime
+
+
+class RecognitionJobSummary(BaseModel):
+    job_id: str
+    status: str
+    original_filename: str
+    image_sha256: str
+    model_id: str
+    lines_recognized: int
+    transcript: str
+    created_at: datetime
