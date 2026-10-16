@@ -10,7 +10,7 @@ from sqlalchemy.pool import StaticPool
 
 from app import main
 from app.database import Base, get_db
-from app.models import RecognitionJob
+from app.models import RecognitionJob, StyleSample
 from app.services import handwriting_recognition as recognition
 
 
@@ -133,6 +133,85 @@ def test_recognize_api_persists_transcript_and_hash_in_sqlite(monkeypatch):
             assert saved.status == "COMPLETED"
             assert saved.transcript == "The quick brown fox."
             assert len(saved.image_sha256) == 64
+    finally:
+        main.app.dependency_overrides.pop(get_db, None)
+        test_engine.dispose()
+
+
+def test_style_reference_images_are_persisted_listed_and_deletable(monkeypatch):
+    test_engine = create_engine(
+        "sqlite://",
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
+    Base.metadata.create_all(bind=test_engine)
+    test_session_factory = sessionmaker(
+        bind=test_engine, autoflush=False, autocommit=False, expire_on_commit=False
+    )
+
+    def override_get_db():
+        db = test_session_factory()
+        try:
+            yield db
+        finally:
+            db.close()
+
+    main.app.dependency_overrides[get_db] = override_get_db
+    page = Image.new("RGB", (160, 80), "white")
+    draw = ImageDraw.Draw(page)
+    draw.text((15, 25), "Handwriting", fill="black")
+    page_buffer = BytesIO()
+    page.save(page_buffer, format="PNG")
+    page_bytes = page_buffer.getvalue()
+
+    try:
+        with TestClient(main.app) as client:
+            session_response = client.post("/sessions", json={"user_id": "demo-user"})
+            assert session_response.status_code == 200
+            session_id = session_response.json()["session_id"]
+            style_response = client.post(
+                "/styles",
+                json={
+                    "user_id": "demo-user",
+                    "session_id": session_id,
+                    "parameters": {"sample_count": 1},
+                    "representation_version": "style-reference-images-v1",
+                },
+            )
+            assert style_response.status_code == 200
+            style_id = style_response.json()["style_id"]
+
+            uploaded = client.post(
+                f"/styles/{style_id}/samples",
+                data={"user_id": "demo-user", "session_id": session_id},
+                files=[("files", ("writing.png", page_bytes, "image/png"))],
+            )
+            assert uploaded.status_code == 200
+            saved = uploaded.json()
+            assert len(saved) == 1
+            assert saved[0]["original_filename"] == "writing.png"
+            assert len(saved[0]["image_sha256"]) == 64
+            assert saved[0]["size_bytes"] == len(page_bytes)
+
+            listed = client.get(
+                f"/styles/{style_id}/samples",
+                params={"user_id": "demo-user", "session_id": session_id},
+            )
+            assert listed.status_code == 200
+            assert listed.json()[0]["sample_id"] == saved[0]["sample_id"]
+
+            deleted = client.delete(
+                f"/styles/{style_id}/samples/{saved[0]['sample_id']}",
+                params={"user_id": "demo-user", "session_id": session_id},
+            )
+            assert deleted.status_code == 200
+            assert client.get(
+                f"/styles/{style_id}/samples",
+                params={"user_id": "demo-user", "session_id": session_id},
+            ).json() == []
+
+        with test_session_factory() as db:
+            assert db.query(StyleSample).count() == 0
     finally:
         main.app.dependency_overrides.pop(get_db, None)
         test_engine.dispose()
