@@ -17,6 +17,7 @@ Start the backend in the first terminal:
     .\.venv\Scripts\Activate.ps1
     pip install -r requirements.txt
     Copy-Item .env.example .env
+    py download_htr_model.py
     uvicorn app.main:app --reload
 
 Start the frontend in a second terminal from the repository root:
@@ -37,7 +38,7 @@ Open http://localhost:3000. The frontend's local environment example points to h
 
 ## Model and storage considerations
 
-The HTR model is microsoft/trocr-base-handwritten, MIT-licensed and fine-tuned on IAM. Its model checkpoint alone is about 1.33 GB and downloads from Hugging Face on first recognition, then stays in the local model cache. First run needs network and disk space; CPU inference may be slow. TrOCR is designed for single text-line input; the prototype performs simple line segmentation and is best with clear, single-column English handwriting. Review every transcript.
+The HTR model is microsoft/trocr-base-handwritten, MIT-licensed and fine-tuned on IAM. Its safetensors checkpoint is about 1.33 GB. Run `py download_htr_model.py` to cache it and only the required tokenizer/processor files (weights remain outside Git). First run needs network and disk space; CPU inference may be slow. TrOCR is designed for single text-line input; the prototype performs simple line segmentation and is best with clear, single-column English handwriting. Review every transcript.
 
 The SQLite database already used by the project adds a recognition_jobs table. It stores transcript text, image checksum, filename, model ID, line count and status—not raw uploaded image bytes. Configure WRITLYNX_DATABASE_URL to move the database file.
 
