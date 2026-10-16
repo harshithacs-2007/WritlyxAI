@@ -1,7 +1,7 @@
 from datetime import datetime
 from enum import StrEnum
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, LargeBinary, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -109,6 +109,28 @@ class AuditEvent(Base):
     style_id: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
     generation_id: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
     metadata_json: Mapped[str] = mapped_column(Text, default="{}", nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
+
+
+class StyleSample(Base):
+    """Small user-provided writing reference retained for later style generation."""
+
+    __tablename__ = "style_samples"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    style_id: Mapped[str] = mapped_column(
+        ForeignKey("styles.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    user_id: Mapped[str] = mapped_column(
+        ForeignKey("users.id"), nullable=False, index=True
+    )
+    session_id: Mapped[str] = mapped_column(
+        ForeignKey("sessions.id"), nullable=False, index=True
+    )
+    original_filename: Mapped[str] = mapped_column(String(255), nullable=False)
+    content_type: Mapped[str] = mapped_column(String(64), nullable=False)
+    image_sha256: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    image_bytes: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
 
 
