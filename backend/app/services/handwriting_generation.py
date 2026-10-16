@@ -15,6 +15,8 @@ from typing import Any
 import numpy as np
 from PIL import Image, ImageOps
 
+from app.config import settings
+
 DIFFUSIONPEN_REPO = "konnik/DiffusionPen"
 VAE_REPO = "stabilityai/sd-vae-ft-mse"
 TEXT_ENCODER_REPO = "google/canine-c"
@@ -82,17 +84,31 @@ def _load_models() -> tuple[Any, Any, Any, Any, Any, Any]:
             from app.vendor.diffusionpen.feature_extractor import ImageEncoder
             from app.vendor.diffusionpen.unet import UNetModel
 
-            checkpoint_root = Path(snapshot_download(
-                repo_id=DIFFUSIONPEN_REPO,
-                allow_patterns=[
-                    "diffusionpen_iam_model_path/models/ema_ckpt.pt",
-                    "style_models/iam_style_diffusionpen.pth",
-                ],
-            ))
-            unet_checkpoint = checkpoint_root / "diffusionpen_iam_model_path/models/ema_ckpt.pt"
-            style_checkpoint = checkpoint_root / "style_models/iam_style_diffusionpen.pth"
-            if not unet_checkpoint.is_file() or not style_checkpoint.is_file():
-                raise FileNotFoundError("Official DiffusionPen checkpoint files were not found.")
+            local_unet_path = settings.diffusionpen_checkpoint_path.strip()
+            local_style_path = settings.diffusionpen_style_path.strip()
+            if local_unet_path or local_style_path:
+                if not (local_unet_path and local_style_path):
+                    raise HandwritingGenerationUnavailable(
+                        "Both WRITLYNX_DIFFUSIONPEN_CHECKPOINT_PATH and WRITLYNX_DIFFUSIONPEN_STYLE_PATH must be configured when using local DiffusionPen files."
+                    )
+                unet_checkpoint = Path(local_unet_path).expanduser()
+                style_checkpoint = Path(local_style_path).expanduser()
+                if not unet_checkpoint.is_file() or not style_checkpoint.is_file():
+                    raise HandwritingGenerationUnavailable(
+                        "The configured DiffusionPen local files were not found. Check both paths in backend/.env."
+                    )
+            else:
+                checkpoint_root = Path(snapshot_download(
+                    repo_id=DIFFUSIONPEN_REPO,
+                    allow_patterns=[
+                        "diffusionpen_iam_model_path/models/ema_ckpt.pt",
+                        "style_models/iam_style_diffusionpen.pth",
+                    ],
+                ))
+                unet_checkpoint = checkpoint_root / "diffusionpen_iam_model_path/models/ema_ckpt.pt"
+                style_checkpoint = checkpoint_root / "style_models/iam_style_diffusionpen.pth"
+                if not unet_checkpoint.is_file() or not style_checkpoint.is_file():
+                    raise FileNotFoundError("Official DiffusionPen checkpoint files were not found.")
 
             cuda_ready = torch.cuda.is_available() and torch.cuda.get_device_properties(0).total_memory >= 8 * 1024 ** 3
             device = torch.device("cuda" if cuda_ready else "cpu")
