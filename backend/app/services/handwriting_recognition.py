@@ -64,6 +64,8 @@ def _prepare_lines(image_bytes: bytes) -> list[Any]:
         from PIL import Image, ImageOps
 
         with Image.open(io.BytesIO(image_bytes)) as opened:
+            if (opened.format or "").upper() not in {"PNG", "JPEG", "WEBP"}:
+                raise InvalidHandwritingImage("Upload a PNG, JPEG, or WEBP image.")
             if opened.width < 32 or opened.height < 16:
                 raise InvalidHandwritingImage("The image is too small to recognize.")
             if opened.width * opened.height > MAX_IMAGE_PIXELS:
