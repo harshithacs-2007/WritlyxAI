@@ -4,14 +4,14 @@ from io import BytesIO
 from pathlib import Path
 from uuid import uuid4
 
-from fastapi import Depends, FastAPI, File, Form, HTTPException, Query, UploadFile, status
+from fastapi import Depends, FastAPI, File, Form, HTTPException, Query, Response, UploadFile, status
 from fastapi.middleware.cors import CORSMiddleware
 from PIL import Image, UnidentifiedImageError
 from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.database import Base, engine, get_db
-from app.models import AuditEvent, Generation, RecognitionJob, Style, StyleSample
+from app.models import AuditEvent, Authorization, Generation, GenerationArtifact, RecognitionJob, Style, StyleSample
 from app.schemas import (
     AuthorizationRequest,
     AuthorizationResponse,
@@ -35,6 +35,12 @@ from app.services.handwriting_recognition import (
     InvalidHandwritingImage,
     RecognitionModelUnavailable,
     recognize_english_page,
+)
+from app.services.handwriting_generation import (
+    HandwritingGenerationUnavailable,
+    InvalidStyleReferences,
+    MAX_WORDS_PER_REQUEST,
+    generate_handwriting_page,
 )
 
 from app.services.style_service import create_style, revoke_style
@@ -506,7 +512,13 @@ def authorize_endpoint(
 def generate_endpoint(
     payload: GenerateRequest,
     db: Session = Depends(get_db),
-):
+) -> GenerationResponse:
+    if len(payload.content.split()) > MAX_WORDS_PER_REQUEST:
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail=f"This prototype can generate up to {MAX_WORDS_PER_REQUEST} words per request.",
+        )
+
     auth = consume_authorization(
         db,
         user_id=payload.user_id,
@@ -516,6 +528,27 @@ def generate_endpoint(
         purpose=payload.purpose,
         model_version=payload.model_version,
     )
+    reference_rows = (
+        db.query(StyleSample)
+        .filter(
+            StyleSample.style_id == auth.style_id,
+            StyleSample.user_id == auth.user_id,
+            StyleSample.session_id == auth.session_id,
+        )
+        .order_by(StyleSample.created_at.asc())
+        .all()
+    )
+    if not reference_rows:
+        audit(
+            db, "GENERATION_FAILED", user_id=auth.user_id, session_id=auth.session_id,
+            style_id=auth.style_id,
+            metadata={"reason": "NO_STYLE_REFERENCES", "authorization_id": auth.id},
+        )
+        db.commit()
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="No saved handwriting references are attached to this style. Upload one or more reference images and try again.",
+        )
 
     generation_id = f"gen_{uuid4().hex}"
     provenance_payload = {
@@ -529,7 +562,6 @@ def generate_endpoint(
         "content_fingerprint": auth.content_fingerprint,
     }
     digest = build_provenance_digest(provenance_payload)
-
     generation = Generation(
         id=generation_id,
         user_id=auth.user_id,
@@ -540,28 +572,125 @@ def generate_endpoint(
         model_version=auth.model_version,
         content_fingerprint=auth.content_fingerprint,
         provenance_digest=digest,
-        status="PROTOTYPE_AUTHORIZED",
+        status="PROCESSING",
     )
     db.add(generation)
-
     audit(
-        db,
-        "GENERATION_COMPLETED",
-        user_id=auth.user_id,
-        session_id=auth.session_id,
-        style_id=auth.style_id,
+        db, "GENERATION_STARTED", user_id=auth.user_id, session_id=auth.session_id,
+        style_id=auth.style_id, generation_id=generation_id,
+        metadata={"authorization_id": auth.id, "model_version": auth.model_version},
+    )
+    db.commit()
+
+    try:
+        result = generate_handwriting_page(
+            payload.content,
+            [row.image_bytes for row in reference_rows[:5]],
+        )
+    except InvalidStyleReferences as exc:
+        generation.status = "FAILED"
+        audit(
+            db, "GENERATION_FAILED", user_id=auth.user_id, session_id=auth.session_id,
+            style_id=auth.style_id, generation_id=generation_id,
+            metadata={"reason": "INVALID_STYLE_REFERENCES"},
+        )
+        db.commit()
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=str(exc),
+        ) from exc
+    except HandwritingGenerationUnavailable as exc:
+        generation.status = "FAILED"
+        audit(
+            db, "GENERATION_FAILED", user_id=auth.user_id, session_id=auth.session_id,
+            style_id=auth.style_id, generation_id=generation_id,
+            metadata={"reason": "MODEL_UNAVAILABLE"},
+        )
+        db.commit()
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=str(exc),
+        ) from exc
+    except ValueError as exc:
+        generation.status = "FAILED"
+        audit(
+            db, "GENERATION_FAILED", user_id=auth.user_id, session_id=auth.session_id,
+            style_id=auth.style_id, generation_id=generation_id,
+            metadata={"reason": "INVALID_GENERATION_REQUEST"},
+        )
+        db.commit()
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=str(exc),
+        ) from exc
+    except Exception as exc:
+        generation.status = "FAILED"
+        audit(
+            db, "GENERATION_FAILED", user_id=auth.user_id, session_id=auth.session_id,
+            style_id=auth.style_id, generation_id=generation_id,
+            metadata={"reason": "GENERATION_ERROR"},
+        )
+        db.commit()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Handwriting generation failed. Check backend logs and retry with a shorter text and clearer reference images.",
+        ) from exc
+
+    artifact = GenerationArtifact(
         generation_id=generation_id,
+        model_id=result["model_id"],
+        original_text=payload.content,
+        image_bytes=result["image_bytes"],
+        words_generated=int(result["words_generated"]),
+        reference_words_used=int(result["reference_words_used"]),
+    )
+    db.add(artifact)
+    generation.status = "COMPLETED"
+    audit(
+        db, "GENERATION_COMPLETED", user_id=auth.user_id, session_id=auth.session_id,
+        style_id=auth.style_id, generation_id=generation_id,
         metadata={
             "authorization_id": auth.id,
             "provenance_digest": digest,
+            "model_id": result["model_id"],
+            "words_generated": result["words_generated"],
+            "reference_words_used": result["reference_words_used"],
         },
     )
     db.commit()
+    db.refresh(generation)
 
     return GenerationResponse(
         generation_id=generation_id,
         status=generation.status,
         provenance_digest=digest,
+        model_id=result["model_id"],
+        image_url=f"/generations/{generation_id}/image",
+        words_generated=int(result["words_generated"]),
+        reference_words_used=int(result["reference_words_used"]),
+    )
+
+
+@app.get("/generations/{generation_id}/image")
+def generation_image_endpoint(
+    generation_id: str,
+    user_id: str = Query(min_length=1, max_length=64),
+    session_id: str = Query(min_length=1, max_length=64),
+    db: Session = Depends(get_db),
+) -> Response:
+    require_active_session(db, user_id, session_id)
+    generation = db.get(Generation, generation_id)
+    if generation is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Generation not found.")
+    if generation.user_id != user_id or generation.session_id != session_id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Generation context mismatch.")
+    artifact = db.get(GenerationArtifact, generation_id)
+    if artifact is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Generated image is not available.")
+    return Response(
+        content=artifact.image_bytes,
+        media_type="image/png",
+        headers={"Content-Disposition": f'inline; filename="writlynxai-{generation_id}.png"'},
     )
 
 
