@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "WritlynxAI — Secure Personalized Handwriting",
-  description: "Prototype research interface for personalized handwriting synthesis, secure style control, and provenance.",
+  title: "WritLynxAI — Handwriting, both ways",
+  description: "Explore personalized handwriting generation, handwritten text recognition, and traceable style control with WritLynxAI.",
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {

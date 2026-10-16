@@ -1,18 +1,19 @@
-# WritlynxAI Frontend
+# WritLynxAI frontend
 
-Next.js prototype UI for Review II.
+Next.js prototype for two handwriting workflows.
 
-Run in PowerShell:
+- /studio — handwriting sample intake, local visual preview, and the existing FastAPI authorization/provenance flow when NEXT_PUBLIC_API_BASE_URL is configured.
+- /recognize — local source-image preview and editable manual transcript workspace, ready for a future handwritten-text-recognition model.
 
-cd frontend
-npm install
-Copy-Item .env.example .env.local
-npm run dev
+## Run locally
 
-Open http://localhost:3000.
+From this directory, install dependencies, copy .env.example to .env.local, then run npm run dev. Open http://localhost:3000.
 
-For backend integration, set NEXT_PUBLIC_API_BASE_URL to the FastAPI server, normally http://127.0.0.1:8000.
+To connect the FastAPI control layer, set NEXT_PUBLIC_API_BASE_URL in .env.local, normally to http://127.0.0.1:8000.
 
-The Studio uses sessions, styles, authorization and generation from the backend when reachable. When the backend is not reachable, it falls back to a clearly labeled local prototype renderer so the website remains demonstrable.
+## Current prototype boundaries
 
-The generated handwriting is a deterministic browser renderer, not the trained handwriting model. Real style encoding and trained/fine-tuned handwriting generation belong to the research-integration phase.
+- The generation page uses deterministic browser-side visual simulation. It is not a trained handwriting synthesis model and does not extract a real style embedding.
+- When the API URL is configured, generation requests preserve the existing session, style record, authorization, one-time consumption, and provenance endpoint sequence. If the backend request fails, the UI reports the error instead of silently falling back to local mode.
+- The recognition page does not perform OCR or HTR yet. Uploaded images remain in the browser; the transcript can be edited manually and downloaded as a text file.
+- The security backend remains a prototype control layer, not production authentication infrastructure.
