@@ -28,8 +28,6 @@ from app.security.authorization import consume_authorization, issue_authorizatio
 from app.security.sessions import create_session, require_active_session
 from app.services.provenance import build_provenance_digest
 from app.services.handwriting_recognition import (
-    MAX_IMAGE_PIXELS,
-    MAX_LINES_PER_PAGE,
     MODEL_ID,
     InvalidHandwritingImage,
     RecognitionModelUnavailable,
