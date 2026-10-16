@@ -41,7 +41,7 @@ The recognition endpoint accepts multipart form fields file, user_id, and sessio
     py download_htr_model.py
     uvicorn app.main:app --reload
 
-The frontend expects NEXT_PUBLIC_API_BASE_URL=http://127.0.0.1:8000 in frontend/.env.local.
+The frontend expects NEXT_PUBLIC_API_BASE_URL=http://127.0.0.1:8000 in frontend/.env.local. To save model files in a specific folder, add `WRITLYNX_HTR_MODEL_PATH=C:/WritLynxAI-data/TrOCR` to `backend/.env` before running `py download_htr_model.py`; the recognizer will load from that folder. If unset, it uses the default Hugging Face cache.
 
 ## English HTR model
 
