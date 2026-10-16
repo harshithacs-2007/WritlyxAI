@@ -2,113 +2,129 @@
 
 import Link from "next/link";
 import { motion, useReducedMotion, useScroll, useTransform } from "framer-motion";
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import { ThemeToggle } from "./theme";
-
-const fadeUp = { hidden: { opacity: 0, y: 24 }, visible: { opacity: 1, y: 0 } };
 
 export default function Home() {
   const heroRef = useRef<HTMLElement | null>(null);
-  const processRef = useRef<HTMLElement | null>(null);
+  const toolsRef = useRef<HTMLElement | null>(null);
   const reduceMotion = useReducedMotion();
+  const [demoText, setDemoText] = useState("Every line carries a little character.");
+  const [paperStyle, setPaperStyle] = useState<"letter" | "notes">("letter");
   const { scrollYProgress } = useScroll();
-  const { scrollYProgress: heroProgress } = useScroll({ target: heroRef, offset: ["start start", "end start"] });
-  const paperY = useTransform(heroProgress, [0, 1], [0, reduceMotion ? 0 : 96]);
-  const paperRotate = useTransform(heroProgress, [0, 1], [-3, reduceMotion ? -3 : 2]);
-  const processProgress = useScroll({ target: processRef, offset: ["start 68%", "end 70%"] });
-  const lineScale = useTransform(processProgress.scrollYProgress, [0, 1], [0, 1]);
+  const { scrollYProgress: heroProgress } = useScroll({
+    target: heroRef,
+    offset: ["start start", "end start"],
+  });
+  const { scrollYProgress: toolsProgress } = useScroll({
+    target: toolsRef,
+    offset: ["start 72%", "end 65%"],
+  });
+  const paperY = useTransform(heroProgress, [0, 1], [0, reduceMotion ? 0 : 42]);
+  const paperRotate = useTransform(heroProgress, [0, 1], [-1.6, reduceMotion ? -1.6 : 1.1]);
+  const toolProgress = useTransform(toolsProgress, [0, 1], [0, 1]);
 
   return (
-    <main className="site-shell">
-      <motion.div className="scroll-progress" style={{ scaleX: scrollYProgress }} />
-      <nav className="site-nav wrap" aria-label="Main navigation">
-        <Link className="wordmark" href="/" aria-label="WritLynxAI home"><span className="wordmark-symbol">w<span>.</span></span><span>WritLynx<span className="wordmark-ai">AI</span></span></Link>
-        <div className="nav-links"><a href="#workflows">Workflows</a><a href="#method">Method</a><Link href="/recognize">Recognition</Link></div>
-        <ThemeToggle />
-        <Link className="nav-cta" href="/studio">Open studio <span aria-hidden="true">↗</span></Link>
-      </nav>
-
-      <section className="hero wrap" ref={heroRef}>
-        <div className="hero-copy">
-          <motion.div className="eyebrow" initial="hidden" animate="visible" variants={fadeUp} transition={{ duration: reduceMotion ? 0 : .6, ease: [0.22, 1, 0.36, 1] }}><span className="eyebrow-mark" /> PERSONAL HANDWRITING RESEARCH</motion.div>
-          <motion.h1 initial="hidden" animate="visible" variants={fadeUp} transition={{ duration: reduceMotion ? 0 : .78, delay: reduceMotion ? 0 : .08, ease: [0.22, 1, 0.36, 1] }}>Some things deserve to feel <em>human.</em></motion.h1>
-          <motion.p className="hero-description" initial="hidden" animate="visible" variants={fadeUp} transition={{ duration: reduceMotion ? 0 : .72, delay: reduceMotion ? 0 : .16 }}>WritLynxAI explores both sides of handwriting: creating personal, natural-looking writing from digital text, and making difficult handwritten pages easier to read.</motion.p>
-          <motion.div className="hero-actions" initial="hidden" animate="visible" variants={fadeUp} transition={{ duration: reduceMotion ? 0 : .65, delay: reduceMotion ? 0 : .22 }}>
-            <Link className="button button-light" href="/studio">Create handwriting <span aria-hidden="true">↗</span></Link>
-            <Link className="button button-quiet" href="/recognize"><span className="button-play" aria-hidden="true">↳</span> Read a page</Link>
-          </motion.div>
-          <motion.div className="hero-footnote" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: reduceMotion ? 0 : .8, delay: reduceMotion ? 0 : .5 }}><span className="status-orb" /> Research prototype <span className="footnote-divider">/</span> model integration in progress</motion.div>
+    <main className="product-home">
+      <motion.div className="product-scroll-progress" style={{ scaleX: scrollYProgress }} />
+      <header className="product-topbar wrap">
+        <Link className="wordmark" href="/" aria-label="WritLynxAI home">
+          <span className="wordmark-symbol">w<span>.</span></span>
+          <span>WritLynx<span className="wordmark-ai">AI</span></span>
+        </Link>
+        <nav className="product-nav-links" aria-label="Product navigation">
+          <Link href="/studio">Create</Link>
+          <Link href="/recognize">Recognize</Link>
+        </nav>
+        <div className="product-nav-actions">
+          <ThemeToggle />
+          <Link className="product-nav-button" href="/studio">Open studio <span aria-hidden="true">↗</span></Link>
         </div>
-        <motion.div className="hero-art" style={{ y: paperY, rotate: paperRotate }}>
-          <div className="art-orbit orbit-one" /><div className="art-orbit orbit-two" />
-          <div className="art-index">STUDY 01 <span>—</span> THE HUMAN MARK</div>
-          <div className="paper-shadow paper-shadow-back" />
-          <div className="paper-sheet paper-sheet-main">
-            <div className="paper-topline"><span>FIELD NOTES</span><span>WR / 026</span></div>
-            <div className="paper-handwriting"><div>Every line carries</div><div>a little <i>character.</i></div><div className="paper-subline">The pressure. The pause. The person.</div></div>
-            <svg className="paper-scribble" viewBox="0 0 245 78" role="img" aria-label="Decorative pen stroke"><path d="M5 49 C24 7 34 75 55 35 S85 16 86 48 S108 67 125 33 S147 11 150 45 S173 71 191 38 S219 23 240 44" /><path d="M12 67 C55 58 75 72 112 61 S180 70 224 57" /></svg>
-            <div className="paper-stamp"><span>W</span><small>STYLE<br />STUDY</small></div>
-            <div className="paper-bottomline"><span>INK / PAPER / MEMORY</span><span>01—02</span></div>
-          </div>
-          <div className="floating-note note-top"><span className="note-dot" /> STYLE, PRESERVED</div>
-          <div className="floating-note note-bottom"><span className="note-glyph">Aa</span><span>FROM IMAGE<br /><b>TO MEANING</b></span></div>
-        </motion.div>
-        <a className="scroll-cue" href="#workflows"><span className="scroll-cue-line" /> Scroll to explore</a>
-      </section>
+      </header>
 
-      <section className="workflow-section section-wrap" id="workflows">
-        <motion.div className="section-heading" initial="hidden" whileInView="visible" viewport={{ once: true, amount: .3 }} variants={fadeUp} transition={{ duration: reduceMotion ? 0 : .65 }}>
-          <div><p className="eyebrow">TWO DIRECTIONS · ONE PURPOSE</p><h2>From words to writing.<br /><em>From writing to words.</em></h2></div>
-          <p className="section-intro">Two distinct AI problems, connected by a shared respect for the way people write.</p>
-        </motion.div>
-        <div className="workflow-grid">
-          <motion.article className="workflow-card generation-card" initial="hidden" whileInView="visible" viewport={{ once: true, amount: .2 }} variants={fadeUp} transition={{ duration: reduceMotion ? 0 : .7, delay: reduceMotion ? 0 : .04 }}>
-            <div className="workflow-card-top"><span className="workflow-number">01 / GENERATION</span><span className="card-arrow">↗</span></div>
-            <div className="workflow-visual generation-visual">
-              <div className="mini-paper mini-paper-back" /><div className="mini-paper mini-paper-front"><div className="mini-paper-meta">A NOTE TO REMEMBER</div><div className="mini-hand">Meet me where<br />the light comes in.</div><div className="mini-signature">— with care</div></div>
-              <div className="visual-caption">DIGITAL TEXT <span>→</span> PERSONAL STYLE</div>
+      <section className="product-hero wrap" ref={heroRef}>
+        <div className="product-hero-copy">
+          <div className="product-kicker"><span /> HANDWRITING, BOTH WAYS</div>
+          <h1>Make text feel<br /><em>human again.</em></h1>
+          <p className="product-hero-description">
+            Turn digital words into a handwriting-style preview, or prepare a handwritten page for editable text. One workspace for both directions.
+          </p>
+          <div className="product-hero-actions">
+            <Link className="product-primary-button" href="/studio">Create handwriting <span aria-hidden="true">↗</span></Link>
+            <Link className="product-secondary-button" href="/recognize">Read a handwritten page <span aria-hidden="true">→</span></Link>
+          </div>
+          <div className="product-availability"><span className="product-status-dot" /> Interactive prototype <span className="product-status-divider">·</span> AI model connections in progress</div>
+        </div>
+
+        <motion.section className="product-demo" style={{ y: paperY, rotate: paperRotate }} aria-label="Interactive handwriting preview demo">
+          <div className="product-demo-header">
+            <div className="product-window-dots" aria-hidden="true"><i /><i /><i /></div>
+            <span>QUICK PREVIEW</span>
+            <span className="product-demo-badge">ILLUSTRATIVE</span>
+          </div>
+          <div className="product-demo-body">
+            <div className={"product-preview-paper " + (paperStyle === "notes" ? "is-notes" : "is-letter")}>
+              <div className="product-paper-topline"><span>PERSONAL NOTES</span><span>WR / 01</span></div>
+              <div className="product-paper-copy">{demoText.trim() || "Your words will appear here."}</div>
+              <div className="product-paper-rule" />
+              <div className="product-paper-footer"><span>INK · PAPER · YOU</span><span>PREVIEW</span></div>
             </div>
-            <div className="workflow-card-copy"><h3>Make digital text feel handwritten.</h3><p>Start with words and a writing sample. Explore a style-conditioned output preview, with authorization and provenance controls around the request.</p><Link className="text-link" href="/studio">Explore generation <span>↗</span></Link></div>
-          </motion.article>
-          <motion.article className="workflow-card recognition-card" initial="hidden" whileInView="visible" viewport={{ once: true, amount: .2 }} variants={fadeUp} transition={{ duration: reduceMotion ? 0 : .7, delay: reduceMotion ? 0 : .16 }}>
-            <div className="workflow-card-top"><span className="workflow-number">02 / RECOGNITION</span><span className="card-arrow">↗</span></div>
-            <div className="workflow-visual recognition-visual">
-              <div className="manuscript-sheet"><div className="manuscript-tag">ARCHIVE / FRAGMENT 004</div><div className="manuscript-line line-a">In the beginning, the letters</div><div className="manuscript-line line-b">were shaped by hand, not machine.</div><div className="manuscript-line line-c">A record of thought, made visible.</div><div className="scan-focus"><span /><span /><span /><span /></div></div>
-              <div className="recognition-float"><span>↳</span><div><b>Image</b><small>to transcript</small></div></div>
+          </div>
+          <div className="product-demo-controls">
+            <label className="product-demo-label" htmlFor="quick-preview-text">Try your own words</label>
+            <textarea id="quick-preview-text" value={demoText} onChange={(event) => setDemoText(event.target.value)} maxLength={180} rows={2} placeholder="Type a short note…" />
+            <div className="product-demo-control-row">
+              <div className="product-paper-switch" role="group" aria-label="Choose preview paper style">
+                <button type="button" className={paperStyle === "letter" ? "is-active" : ""} aria-pressed={paperStyle === "letter"} onClick={() => setPaperStyle("letter")}>Letter</button>
+                <button type="button" className={paperStyle === "notes" ? "is-active" : ""} aria-pressed={paperStyle === "notes"} onClick={() => setPaperStyle("notes")}>Notes</button>
+              </div>
+              <Link className="product-demo-open" href={"/studio?text=" + encodeURIComponent(demoText)}>Continue in studio ↗</Link>
             </div>
-            <div className="workflow-card-copy"><h3>Make difficult writing easier to read.</h3><p>Prepare a scanned page for transcription. The recognition workspace is ready for a language-specific HTR model; automatic recognition is not connected yet.</p><Link className="text-link" href="/recognize">Explore recognition <span>↗</span></Link></div>
+          </div>
+          <p className="product-demo-disclaimer">Live text preview only. Real AI handwriting generation is not connected yet.</p>
+        </motion.section>
+
+        <a className="product-scroll-cue" href="#product-tools"><span /> Explore the tools</a>
+      </section>
+
+      <section className="product-tools section-wrap" id="product-tools" ref={toolsRef}>
+        <div className="product-tools-intro">
+          <div className="product-kicker"><span /> YOUR WORKSPACE</div>
+          <h2>Start with what<br />you need to do.</h2>
+          <p>No complicated setup. Choose a task to open its workspace and continue from there.</p>
+          <div className="product-tools-progress" aria-hidden="true"><motion.span style={{ scaleY: toolProgress }} /></div>
+        </div>
+
+        <div className="product-tool-list">
+          <motion.article className="product-tool-card" initial={{ opacity: 0, y: reduceMotion ? 0 : 22 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, amount: 0.3 }} transition={{ duration: reduceMotion ? 0 : 0.48 }}>
+            <div className="product-tool-card-head"><span className="product-tool-icon" aria-hidden="true">Aa</span><span className="product-tool-label">01 <i /> GENERATION</span></div>
+            <h3>Give your text a handwriting style.</h3>
+            <p>Upload a writing sample, enter your words, and inspect a paper preview with a request record.</p>
+            <div className="product-tool-meta"><span>Sample image</span><span>Text input</span><span>Preview</span></div>
+            <Link className="product-tool-link" href="/studio">Open handwriting studio <span aria-hidden="true">↗</span></Link>
+          </motion.article>
+
+          <motion.article className="product-tool-card" initial={{ opacity: 0, y: reduceMotion ? 0 : 22 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, amount: 0.3 }} transition={{ duration: reduceMotion ? 0 : 0.48, delay: reduceMotion ? 0 : 0.08 }}>
+            <div className="product-tool-card-head"><span className="product-tool-icon product-tool-icon-recognition" aria-hidden="true">文</span><span className="product-tool-label">02 <i /> RECOGNITION</span></div>
+            <h3>Make a handwritten page editable.</h3>
+            <p>Preview a scanned page, type or correct its transcription, then save the text as a file.</p>
+            <div className="product-tool-meta"><span>Image preview</span><span>Editable text</span><span>Download</span></div>
+            <Link className="product-tool-link" href="/recognize">Open recognition workspace <span aria-hidden="true">↗</span></Link>
           </motion.article>
         </div>
       </section>
 
-      <section className="method-section" id="method" ref={processRef}>
-        <div className="method-layout section-wrap">
-          <div className="method-copy"><p className="eyebrow">THE METHOD</p><h2>A careful process.<br /><em>Not a magic button.</em></h2><p>Reliable handwriting AI starts with reliable examples. Each image needs the correct transcript, each style must stay attached to its owner, and each generated result needs a traceable record.</p><Link className="button button-outline" href="/studio">See the prototype <span aria-hidden="true">↗</span></Link></div>
-          <div className="method-steps"><motion.div className="method-rail"><motion.div className="method-rail-fill" style={{ scaleY: lineScale }} /></motion.div>
-            {[
-              ["01", "Collect", "Photograph known text and keep the exact transcript beside it."],
-              ["02", "Learn", "Evaluate language-compatible models against verified handwriting samples."],
-              ["03", "Control", "Bind a generation request to its user, style, purpose and content."],
-              ["04", "Trace", "Keep a provenance record so the prototype output can be inspected."],
-            ].map(([number, title, copy], index) => (
-              <motion.article className="method-step" key={number} initial={{ opacity: 0, x: reduceMotion ? 0 : 18 }} whileInView={{ opacity: 1, x: 0 }} viewport={{ once: true, amount: .65 }} transition={{ duration: reduceMotion ? 0 : .55, delay: reduceMotion ? 0 : index * .04 }}>
-                <span className="step-number">{number}</span><div><h3>{title}</h3><p>{copy}</p></div>
-              </motion.article>
-            ))}
-          </div>
-        </div>
+      <section className="product-bottom wrap">
+        <div className="product-bottom-mark" aria-hidden="true">w.</div>
+        <div><h2>Made for the page in front of you.</h2><p>Use the current prototype to explore the workflow. Model-powered handwriting generation and automatic recognition remain future integration steps.</p></div>
+        <Link className="product-bottom-link" href="/studio">Go to studio ↗</Link>
       </section>
 
-      <section className="language-section section-wrap">
-        <motion.div className="language-panel" initial={{ opacity: 0, y: 24 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, amount: .25 }} transition={{ duration: reduceMotion ? 0 : .65 }}>
-          <div className="language-copy"><p className="eyebrow">BUILT TO GROW</p><h2>Many scripts.<br /><em>Many stories.</em></h2><p>English is a starting point for model exploration. Tamil, Telugu, Hindi and Sanskrit need script-aware datasets and model evaluation. Historical manuscripts remain a longer-term research direction.</p></div>
-          <div className="script-grid" aria-label="Planned language support">
-            <div className="script-tile"><span>En</span><b>English</b><small>BASELINE</small></div><div className="script-tile script-indic"><span>அ</span><b>Tamil</b><small>DATA PILOT</small></div><div className="script-tile script-indic"><span>తె</span><b>Telugu</b><small>PLANNED</small></div><div className="script-tile script-indic"><span>अ</span><b>Hindi</b><small>PLANNED</small></div><div className="script-tile script-indic"><span>सं</span><b>Sanskrit</b><small>PLANNED</small></div><div className="script-tile script-more"><span>+</span><b>More scripts</b><small>IN TIME</small></div>
-          </div>
-        </motion.div>
-      </section>
-      <section className="closing-section wrap"><div><p className="eyebrow">THE WRITLYNXAI WORKSPACE</p><h2>Give every page<br />a way forward.</h2></div><div className="closing-actions"><Link className="button button-light" href="/studio">Start with generation <span>↗</span></Link><Link className="button button-quiet" href="/recognize">Prepare a page <span>↗</span></Link></div></section>
-      <footer className="site-footer wrap"><Link className="wordmark" href="/"><span className="wordmark-symbol">w<span>.</span></span><span>WritLynx<span className="wordmark-ai">AI</span></span></Link><p>PERSONAL HANDWRITING · CONTROLLED STYLE · TRACEABLE OUTPUT</p><span className="footer-prototype"><i /> RESEARCH PROTOTYPE</span></footer>
+      <footer className="product-footer wrap">
+        <Link className="wordmark" href="/"><span className="wordmark-symbol">w<span>.</span></span><span>WritLynx<span className="wordmark-ai">AI</span></span></Link>
+        <span>HANDWRITING TOOLS · INTERACTIVE PROTOTYPE</span>
+        <div><Link href="/studio">Generation</Link><Link href="/recognize">Recognition</Link></div>
+      </footer>
     </main>
   );
 }
