@@ -1,68 +1,123 @@
-import Link from "next/link";
+"use client";
 
-const principles = [
-  ["01", "Personal style", "Learn a writer-specific visual style from a small sample set."],
-  ["02", "Controlled use", "Bind each generation request to an authorized user, session and purpose."],
-  ["03", "Traceable output", "Attach generation metadata so every prototype output has a provenance trail."],
-];
+import Link from "next/link";
+import { motion, useReducedMotion, useScroll, useTransform } from "framer-motion";
+import { useRef, useState } from "react";
+import { ThemeToggle } from "./theme";
 
 export default function Home() {
+  const heroRef = useRef<HTMLElement | null>(null);
+  const toolsRef = useRef<HTMLElement | null>(null);
+  const reduceMotion = useReducedMotion();
+  const [demoText, setDemoText] = useState("Every line carries a little character.");
+  const [paperStyle, setPaperStyle] = useState<"letter" | "notes">("letter");
+  const { scrollYProgress } = useScroll();
+  const { scrollYProgress: heroProgress } = useScroll({
+    target: heroRef,
+    offset: ["start start", "end start"],
+  });
+  const { scrollYProgress: toolsProgress } = useScroll({
+    target: toolsRef,
+    offset: ["start 72%", "end 65%"],
+  });
+  const paperY = useTransform(heroProgress, [0, 1], [0, reduceMotion ? 0 : 42]);
+  const paperRotate = useTransform(heroProgress, [0, 1], [-1.6, reduceMotion ? -1.6 : 1.1]);
+  const toolProgress = useTransform(toolsProgress, [0, 1], [0, 1]);
+
   return (
-    <main className="landing">
-      <nav className="nav container">
-        <Link className="brand" href="/"><span className="brand-mark">W</span><span>WritlynxAI</span></Link>
-        <div className="nav-right">
-          <span className="research-pill"><i /> Research prototype</span>
-          <Link className="nav-link" href="/studio">Open studio</Link>
+    <main className="product-home">
+      <motion.div className="product-scroll-progress" style={{ scaleX: reduceMotion ? 0 : scrollYProgress }} />
+      <header className="product-topbar wrap">
+        <Link className="wordmark" href="/" aria-label="WritLynxAI home">
+          <span className="wordmark-symbol">w<span>.</span></span>
+          <span>WritLynx<span className="wordmark-ai">AI</span></span>
+        </Link>
+        <nav className="product-nav-links" aria-label="Product navigation">
+          <Link href="/studio">Create</Link>
+          <Link href="/recognize">Recognize</Link>
+        </nav>
+        <div className="product-nav-actions">
+          <ThemeToggle />
+          <Link className="product-nav-button" href="/studio">Open studio <span aria-hidden="true">↗</span></Link>
         </div>
-      </nav>
+      </header>
 
-      <section className="hero container">
-        <div className="hero-copy">
-          <p className="eyebrow">PERSONALIZED HANDWRITING · CONTROLLED STYLE · PROVENANCE</p>
-          <h1>Handwriting that feels <em>personal.</em> Control that stays deliberate.</h1>
-          <p className="hero-text">
-            WritlynxAI explores personalized handwriting synthesis with a security layer around the learned style representation — so the system can reason about who may use a style, for what purpose, and which generation produced the output.
+      <section className="product-hero wrap" ref={heroRef}>
+        <div className="product-hero-copy">
+          <div className="product-kicker"><span /> HANDWRITING, BOTH WAYS</div>
+          <h1>Make text feel<br /><em>human again.</em></h1>
+          <p className="product-hero-description">
+            Turn digital words into a handwriting-style preview, or prepare a handwritten page for editable text. One workspace for both directions.
           </p>
-          <div className="hero-actions">
-            <Link className="button primary" href="/studio">Try the prototype <span>↗</span></Link>
-            <a className="button ghost" href="#research">See the research direction</a>
+          <div className="product-hero-actions">
+            <Link className="product-primary-button" href="/studio">Create handwriting <span aria-hidden="true">↗</span></Link>
+            <Link className="product-secondary-button" href="/recognize">Read a handwritten page <span aria-hidden="true">→</span></Link>
           </div>
-          <div className="hero-proof"><span>●</span> Browser-first demo · FastAPI control layer · SQLite prototype persistence</div>
+          <div className="product-availability"><span className="product-status-dot" /> Interactive prototype <span className="product-status-divider">·</span> AI model connections in progress</div>
         </div>
 
-        <div className="hero-visual">
-          <div className="paper-stack">
-            <div className="paper back-paper" />
-            <div className="paper main-paper">
-              <span className="paper-note">STYLE 001 / PROTOTYPE</span>
-              <div className="paper-name">Dear future me,</div>
-              <div className="paper-line">your handwriting should still</div>
-              <div className="paper-line">look like <span>you.</span></div>
-              <div className="paper-sign">— WritlynxAI</div>
-              <div className="paper-seal">PROVENANCE<br /><strong>BOUND</strong></div>
+        <motion.section className="product-demo" style={{ y: paperY, rotate: paperRotate }} aria-label="Interactive handwriting preview demo">
+          <div className="product-demo-header">
+            <div className="product-window-dots" aria-hidden="true"><i /><i /><i /></div>
+            <span>QUICK PREVIEW</span>
+            <span className="product-demo-badge">ILLUSTRATIVE</span>
+          </div>
+          <div className="product-demo-body">
+            <div className={"product-preview-paper " + (paperStyle === "notes" ? "is-notes" : "is-letter")}>
+              <div className="product-paper-topline"><span>PERSONAL NOTES</span><span>WR / 01</span></div>
+              <div className="product-paper-copy">{demoText.trim() || "Your words will appear here."}</div>
+              <div className="product-paper-rule" />
+              <div className="product-paper-footer"><span>INK · PAPER · YOU</span><span>PREVIEW</span></div>
             </div>
           </div>
+          <div className="product-demo-controls">
+            <label className="product-demo-label" htmlFor="quick-preview-text">Try your own words</label>
+            <textarea id="quick-preview-text" value={demoText} onChange={(event) => setDemoText(event.target.value)} maxLength={180} rows={2} placeholder="Type a short note…" />
+            <div className="product-demo-control-row">
+              <div className="product-paper-switch" role="group" aria-label="Choose preview paper style">
+                <button type="button" className={paperStyle === "letter" ? "is-active" : ""} aria-pressed={paperStyle === "letter"} onClick={() => setPaperStyle("letter")}>Letter</button>
+                <button type="button" className={paperStyle === "notes" ? "is-active" : ""} aria-pressed={paperStyle === "notes"} onClick={() => setPaperStyle("notes")}>Notes</button>
+              </div>
+              <Link className="product-demo-open" href={"/studio?text=" + encodeURIComponent(demoText)}>Continue in studio ↗</Link>
+            </div>
+          </div>
+          <p className="product-demo-disclaimer">Live text preview only. Real AI handwriting generation is not connected yet.</p>
+        </motion.section>
+
+        <a className="product-scroll-cue" href="#product-tools"><span /> Explore the tools</a>
+      </section>
+
+      <section className="product-tools section-wrap" id="product-tools" ref={toolsRef}>
+        <div className="product-tools-intro">
+          <div className="product-kicker"><span /> YOUR WORKSPACE</div>
+          <h2>Start with what<br />you need to do.</h2>
+          <p>No complicated setup. Choose a task to open its workspace and continue from there.</p>
+          <div className="product-tools-progress" aria-hidden="true"><motion.span style={{ scaleY: reduceMotion ? 0 : toolProgress }} /></div>
+        </div>
+
+        <div className="product-tool-list">
+          <motion.article className="product-tool-card" initial={{ opacity: 0, y: reduceMotion ? 0 : 22 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, amount: 0.3 }} transition={{ duration: reduceMotion ? 0 : 0.48 }}>
+            <div className="product-tool-card-head"><span className="product-tool-icon" aria-hidden="true">Aa</span><span className="product-tool-label">01 <i /> GENERATION</span></div>
+            <h3>Give your text a handwriting style.</h3>
+            <p>Upload a writing sample, enter your words, and inspect a paper preview with a request record.</p>
+            <div className="product-tool-meta"><span>Sample image</span><span>Text input</span><span>Preview</span></div>
+            <Link className="product-tool-link" href="/studio">Open handwriting studio <span aria-hidden="true">↗</span></Link>
+          </motion.article>
+
+          <motion.article className="product-tool-card" initial={{ opacity: 0, y: reduceMotion ? 0 : 22 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, amount: 0.3 }} transition={{ duration: reduceMotion ? 0 : 0.48, delay: reduceMotion ? 0 : 0.08 }}>
+            <div className="product-tool-card-head"><span className="product-tool-icon product-tool-icon-recognition" aria-hidden="true">文</span><span className="product-tool-label">02 <i /> RECOGNITION</span></div>
+            <h3>Make a handwritten page editable.</h3>
+            <p>Preview a scanned page, type or correct its transcription, then save the text as a file.</p>
+            <div className="product-tool-meta"><span>Image preview</span><span>Editable text</span><span>Download</span></div>
+            <Link className="product-tool-link" href="/recognize">Open recognition workspace <span aria-hidden="true">↗</span></Link>
+          </motion.article>
         </div>
       </section>
 
-      <section id="research" className="principles container">
-        {principles.map(([number, title, copy]) => (
-          <article className="principle" key={number}>
-            <span>{number}</span><h2>{title}</h2><p>{copy}</p>
-          </article>
-        ))}
-      </section>
-
-      <section className="split-section container">
-        <div><p className="eyebrow">THE CORE IDEA</p><h2>Generation is only one half of the problem.</h2></div>
-        <p className="split-copy">
-          The research layer begins after style extraction: user binding, session binding, purpose and model binding, content binding, replay resistance, revocation, isolation, and provenance are treated as first-class controls around personal style usage.
-        </p>
-      </section>
-
-      <footer className="footer container">
-        <span>WritlynxAI · Review II prototype</span><span>Prototype renderer · Not production security</span>
+      <footer className="product-footer wrap">
+        <Link className="wordmark" href="/"><span className="wordmark-symbol">w<span>.</span></span><span>WritLynx<span className="wordmark-ai">AI</span></span></Link>
+        <span>HANDWRITING TOOLS · INTERACTIVE PROTOTYPE</span>
+        <div><Link href="/studio">Generation</Link><Link href="/recognize">Recognition</Link></div>
       </footer>
     </main>
   );

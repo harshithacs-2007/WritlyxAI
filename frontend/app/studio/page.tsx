@@ -1,284 +1,364 @@
-'use client';
+"use client";
 
-import { ChangeEvent, useMemo, useState } from "react";
+import { ChangeEvent, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { motion } from "framer-motion";
+import Image from "next/image";
+import { motion, useReducedMotion } from "framer-motion";
+import { ThemeToggle } from "../theme";
 
 type Mode = "mock" | "backend";
-type StyleMeta = { styleId: string; seed: number; fileName: string; size: number; sampleCount: number };
-type Result = { generationId: string; fingerprint: string; provenanceDigest: string; mode: Mode };
-
+type StyleMeta = { styleId: string; backendStyleId?: string; sampleIds?: string[]; seed: number; fileName: string; size: number; sampleCount: number };
+type Result = { generationId: string; fingerprint: string; provenanceDigest: string; mode: Mode; imageUrl?: string; modelId?: string; wordsGenerated?: number; referenceWordsUsed?: number };
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, "");
 
 async function sha256(text: string) {
   const buffer = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
   return Array.from(new Uint8Array(buffer)).map((byte) => byte.toString(16).padStart(2, "0")).join("");
 }
-
 async function postJSON<T>(path: string, body: unknown): Promise<T> {
   if (!API_BASE) throw new Error("Backend URL not configured.");
-  const response = await fetch(API_BASE + path, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
+  const response = await fetch(API_BASE + path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
   if (!response.ok) {
     const error = await response.json().catch(() => ({}));
     throw new Error(error.detail || "Backend request failed (" + response.status + ")");
   }
   return response.json() as Promise<T>;
 }
-
 function seededValue(seed: number, index: number) {
   const x = Math.sin(seed * 12.9898 + index * 78.233) * 43758.5453;
   return x - Math.floor(x);
 }
 
+function escapeXml(value: string) {
+  const entities: Record<string, string> = {
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&apos;",
+  };
+  return value.replace(/[&<>"']/g, (character) => entities[character]);
+}
+
 export default function StudioPage() {
-  const [file, setFile] = useState<File | null>(null);
+  const reduceMotion = useReducedMotion();
+  const [files, setFiles] = useState<File[]>([]);
+  const [samplePreview, setSamplePreview] = useState("");
   const [style, setStyle] = useState<StyleMeta | null>(null);
   const [text, setText] = useState("Make it look like I wrote it.");
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
-  const [status, setStatus] = useState("Ready");
+  const [status, setStatus] = useState("Ready for a sample");
   const [result, setResult] = useState<Result | null>(null);
   const [userId, setUserId] = useState("demo-user");
   const [sessionId, setSessionId] = useState("");
+  const [sessionUserId, setSessionUserId] = useState("");
   const [error, setError] = useState("");
 
+  useEffect(() => {
+    const initialText = new URLSearchParams(window.location.search).get("text");
+    if (initialText) setText(initialText.slice(0, 5000));
+  }, []);
+
+  useEffect(() => {
+    const firstFile = files[0];
+    if (!firstFile || !firstFile.type.startsWith("image/")) { setSamplePreview(""); return; }
+    const objectUrl = URL.createObjectURL(firstFile);
+    setSamplePreview(objectUrl);
+    return () => URL.revokeObjectURL(objectUrl);
+  }, [files]);
+
+  const wordCount = useMemo(() => text.trim().split(/\\s+/).filter(Boolean).length, [text]);
+
   const lines = useMemo(() => {
-    const words = text.trim().split(/\s+/).slice(0, 24);
+    const words = text.trim().split(/\s+/).filter(Boolean).slice(0, 48);
     const rows: string[][] = [];
-    for (let i = 0; i < words.length; i += 4) rows.push(words.slice(i, i + 4));
-    return rows.length ? rows : [["Start", "typing", "to", "generate."]];
+    for (let i = 0; i < words.length; i += 5) rows.push(words.slice(i, i + 5));
+    return rows.length ? rows : [["Your", "words", "will", "appear", "here."]];
   }, [text]);
 
+  const svgPreview = useMemo(() => {
+    const rows = lines.map((row) => row.join(" "));
+    const height = Math.max(430, 185 + rows.length * 43);
+    const writing = rows.map((row, index) =>
+      `<tspan x="92" dy="${index === 0 ? 0 : 43}">${escapeXml(row)}</tspan>`
+    ).join("");
+    return `<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="${height}" viewBox="0 0 1000 ${height}">
+      <defs><pattern id="paper-lines" width="1000" height="43" patternUnits="userSpaceOnUse"><path d="M0 42.5H1000" stroke="#d9cdb8" stroke-width="1"/></pattern></defs>
+      <rect width="1000" height="${height}" fill="#f0e7d5"/>
+      <rect width="1000" height="${height}" fill="url(#paper-lines)"/>
+      <text x="92" y="48" font-family="Arial,sans-serif" font-size="12" letter-spacing="2.2" fill="#8e836f">WRTLYNXAI / ILLUSTRATIVE PREVIEW</text>
+      <text x="92" y="105" font-family="Segoe Print,Bradley Hand,Comic Sans MS,cursive" font-size="31" fill="#282720">${writing}</text>
+      <text x="92" y="${height - 28}" font-family="Arial,sans-serif" font-size="11" letter-spacing="2" fill="#8e836f">SIMULATED PREVIEW · NOT AI-GENERATED</text>
+    </svg>`;
+  }, [lines]);
+
   const handleUpload = async (event: ChangeEvent<HTMLInputElement>) => {
-    const selected = event.target.files?.[0];
-    if (!selected) return;
+    const selectedFiles = Array.from(event.target.files ?? []);
+    event.target.value = "";
+    if (!selectedFiles.length) return;
+    if (selectedFiles.length > 5) {
+      setError("Choose up to five reference images from the same writer.");
+      return;
+    }
+    if (selectedFiles.some((selected) => !["image/png", "image/jpeg", "image/webp"].includes(selected.type))) {
+      setError("Use PNG, JPEG, or WEBP handwriting images.");
+      return;
+    }
+    if (selectedFiles.some((selected) => selected.size > 8 * 1024 * 1024)) {
+      setError("Each reference image must be 8 MB or smaller.");
+      return;
+    }
+
     setError("");
     setResult(null);
+    setFiles(selectedFiles);
+    setStyle(null);
     setIsAnalyzing(true);
-    setStatus("Reading sample…");
+    setStatus("Preparing handwriting references");
 
-    const content = selected.name + ":" + selected.size + ":" + selected.lastModified;
-    const fingerprint = await sha256(content);
-    const seed = parseInt(fingerprint.slice(0, 8), 16) || 1;
+    try {
+      const fingerprint = await sha256(
+        selectedFiles.map((selected) => selected.name + ":" + selected.size + ":" + selected.lastModified).join("|")
+      );
+      const seed = parseInt(fingerprint.slice(0, 8), 16) || 1;
+      let backendStyleId: string | undefined;
+      let sampleIds: string[] | undefined;
 
-    await new Promise((resolve) => setTimeout(resolve, 650));
+      if (API_BASE) {
+        const session = await ensureBackendSession();
+        if (!session) throw new Error("A backend session could not be created.");
+        const styleResponse = await postJSON<{ style_id: string }>("/styles", {
+          user_id: userId.trim(),
+          session_id: session,
+          parameters: { sample_count: selectedFiles.length, source_size: selectedFiles.reduce((sum, selected) => sum + selected.size, 0) },
+          representation_version: "style-reference-images-v1",
+        });
+        const form = new FormData();
+        form.append("user_id", userId.trim());
+        form.append("session_id", session);
+        selectedFiles.forEach((selected) => form.append("files", selected, selected.name));
+        const uploadResponse = await fetch(API_BASE + "/styles/" + encodeURIComponent(styleResponse.style_id) + "/samples", {
+          method: "POST",
+          body: form,
+        });
+        const uploadData = await uploadResponse.json().catch(() => ({}));
+        if (!uploadResponse.ok) {
+          throw new Error(uploadData.detail || "Could not save the handwriting references.");
+        }
+        backendStyleId = styleResponse.style_id;
+        sampleIds = (uploadData as Array<{ sample_id: string }>).map((item) => item.sample_id);
+      } else {
+        await new Promise((resolve) => setTimeout(resolve, 240));
+      }
 
-    setFile(selected);
-    setStyle({
-      styleId: "STYLE-" + fingerprint.slice(0, 6).toUpperCase(),
-      seed,
-      fileName: selected.name,
-      size: selected.size,
-      sampleCount: 1,
-    });
-    setStatus("Style captured");
-    setIsAnalyzing(false);
+      const totalSize = selectedFiles.reduce((sum, selected) => sum + selected.size, 0);
+      setStyle({
+        styleId: "STYLE-" + fingerprint.slice(0, 6).toUpperCase(),
+        backendStyleId,
+        sampleIds,
+        seed,
+        fileName: selectedFiles[0].name,
+        size: totalSize,
+        sampleCount: selectedFiles.length,
+      });
+      setStatus(API_BASE
+        ? "References saved in SQLite · ready for DiffusionPen"
+        : "References loaded locally · backend model required");
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Could not prepare the handwriting references.");
+      setStatus("Reference setup blocked");
+    } finally {
+      setIsAnalyzing(false);
+    }
   };
 
   const ensureBackendSession = async () => {
     if (!API_BASE) return null;
-    if (sessionId) return sessionId;
-    try {
-      const session = await postJSON<{ session_id: string }>("/sessions", { user_id: userId });
-      setSessionId(session.session_id);
-      return session.session_id;
-    } catch {
-      return null;
-    }
+    const normalizedUserId = userId.trim();
+    if (sessionId && sessionUserId === normalizedUserId) return sessionId;
+    const session = await postJSON<{ session_id: string }>("/sessions", { user_id: normalizedUserId });
+    setSessionId(session.session_id);
+    setSessionUserId(normalizedUserId);
+    return session.session_id;
   };
 
   const generate = async () => {
-    if (!style) return setError("Upload a handwriting sample first.");
-    if (!text.trim()) return setError("Enter some text to generate.");
-
+    if (!style) { setError("Save at least one handwriting reference before generating a preview."); return; }
+    if (!text.trim()) { setError("Enter the text you want to preview."); return; }
+    if (API_BASE && wordCount > 48) { setError("The current handwriting model supports up to 48 words per page. Shorten the text and retry."); return; }
+    if (!userId.trim()) { setError("Enter a prototype user ID."); return; }
     setError("");
     setIsGenerating(true);
-    setStatus("Authorizing style use…");
+    setStatus(API_BASE ? "Preparing the handwriting model" : "Preparing local visual simulation");
     const contentHash = await sha256(text.trim());
-
     try {
       const session = await ensureBackendSession();
-
       if (API_BASE && session) {
-        const styleResponse = await postJSON<{ style_id: string }>("/styles", {
-          user_id: userId,
-          session_id: session,
+        const backendStyleId = style.backendStyleId ?? (await postJSON<{ style_id: string }>("/styles", {
+          user_id: userId.trim(), session_id: session,
           parameters: { seed: style.seed, sample_count: style.sampleCount, source_size: style.size },
-          representation_version: "prototype-v1",
-        });
-
+          representation_version: "diffusionpen-five-shot-v1",
+        })).style_id;
         const authorization = await postJSON<{ authorization_id: string }>("/authorize", {
-          user_id: userId,
-          session_id: session,
-          style_id: styleResponse.style_id,
-          purpose: "prototype-generation",
-          model_version: "prototype-renderer-v1",
-          content: text.trim(),
+          user_id: userId.trim(), session_id: session, style_id: backendStyleId,
+          purpose: "prototype-generation", model_version: "diffusionpen-iam-v1", content: text.trim(),
         });
-
-        setStatus("Generating with authorized style…");
-
-        const generation = await postJSON<{ generation_id: string; provenance_digest: string }>("/generate", {
-          user_id: userId,
-          session_id: session,
-          authorization_id: authorization.authorization_id,
-          content: text.trim(),
-          purpose: "prototype-generation",
-          model_version: "prototype-renderer-v1",
+        setStatus("Consuming one-time authorization");
+        const generation = await postJSON<{ generation_id: string; provenance_digest: string; image_url: string; model_id: string; words_generated: number; reference_words_used: number }>("/generate", {
+          user_id: userId.trim(), session_id: session, authorization_id: authorization.authorization_id,
+          content: text.trim(), purpose: "prototype-generation", model_version: "diffusionpen-iam-v1",
         });
-
+        const imageQuery = new URLSearchParams({ user_id: userId.trim(), session_id: session });
         setResult({
           generationId: generation.generation_id,
           fingerprint: contentHash,
           provenanceDigest: generation.provenance_digest,
           mode: "backend",
+          imageUrl: API_BASE + generation.image_url + "?" + imageQuery.toString(),
+          modelId: generation.model_id,
+          wordsGenerated: generation.words_generated,
+          referenceWordsUsed: generation.reference_words_used,
         });
-        setStatus("Generated · provenance recorded");
+        setStatus("DiffusionPen generation complete · provenance recorded");
       } else {
-        setStatus("Rendering prototype style…");
-        await new Promise((resolve) => setTimeout(resolve, 750));
+        await new Promise((resolve) => setTimeout(resolve, 520));
         const pseudo = await sha256(style.styleId + ":" + contentHash + ":" + style.seed);
-        setResult({
-          generationId: "GEN-DEMO-" + pseudo.slice(0, 8).toUpperCase(),
-          fingerprint: contentHash,
-          provenanceDigest: pseudo,
-          mode: "mock",
-        });
-        setStatus("Generated · local prototype");
+        setResult({ generationId: "GEN-DEMO-" + pseudo.slice(0, 8).toUpperCase(), fingerprint: contentHash, provenanceDigest: pseudo, mode: "mock" });
+        setStatus("Preview created · local simulation");
       }
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Generation failed.");
-      setStatus("Generation blocked");
-    } finally {
-      setIsGenerating(false);
+      setStatus("Request blocked");
+    } finally { setIsGenerating(false); }
+  };
+
+  const downloadPreview = async () => {
+    if (result?.mode === "backend" && result.imageUrl) {
+      try {
+        const response = await fetch(result.imageUrl);
+        if (!response.ok) throw new Error("The generated image could not be downloaded.");
+        const blob = await response.blob();
+        const objectUrl = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = objectUrl;
+        link.download = "writlynxai-handwriting.png";
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1500);
+      } catch (caught) {
+        setError(caught instanceof Error ? caught.message : "Could not download the image.");
+      }
+      return;
     }
+
+    const link = document.createElement("a");
+    link.href = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svgPreview);
+    link.download = "writlynxai-preview.svg";
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+  };
+
+  const resetSample = async () => {
+    const savedStyle = style;
+    let deletionFailed = false;
+    if (API_BASE && savedStyle?.backendStyleId && sessionId) {
+      const params = new URLSearchParams({ user_id: userId.trim(), session_id: sessionId });
+      try {
+        const deletions = await Promise.all((savedStyle.sampleIds ?? []).map((sampleId) =>
+          fetch(API_BASE + "/styles/" + encodeURIComponent(savedStyle.backendStyleId!) + "/samples/" + encodeURIComponent(sampleId) + "?" + params.toString(), { method: "DELETE" })
+        ));
+        if (deletions.some((response) => !response.ok)) throw new Error("Could not delete all saved reference images.");
+        const revokeResponse = await fetch(API_BASE + "/revoke/" + encodeURIComponent(savedStyle.backendStyleId) + "?" + params.toString(), { method: "POST" });
+        if (!revokeResponse.ok) throw new Error("Could not revoke the saved style reference.");
+      } catch {
+        deletionFailed = true;
+      }
+    }
+    setFiles([]);
+    setStyle(null);
+    setResult(null);
+    setError(deletionFailed ? "The local preview was cleared, but the backend may still retain a reference. Check the backend connection if deletion matters." : "");
+    setStatus("Ready for a sample");
   };
 
   return (
-    <main className="studio-shell">
-      <header className="studio-nav">
-        <Link className="brand" href="/"><span className="brand-mark">W</span>WritlynxAI</Link>
-        <div className="studio-nav-center"><span className="section-active">Studio</span><span>Provenance</span><span>Research</span></div>
-        <div className="status-chip"><i /> Prototype environment</div>
+    <main className="workspace-shell">
+      <header className="workspace-nav wrap">
+        <Link className="wordmark" href="/" aria-label="WritLynxAI home"><span className="wordmark-symbol">w<span>.</span></span><span>WritLynx<span className="wordmark-ai">AI</span></span></Link>
+        <nav className="workspace-tabs" aria-label="Workspaces"><Link className="workspace-tab active" href="/studio">Generation</Link><Link className="workspace-tab" href="/recognize">Recognition <span className="tab-new">BETA</span></Link></nav>
+        <ThemeToggle />
+        <Link className="workspace-exit" href="/">Back to overview <span>↗</span></Link>
       </header>
 
-      <div className="studio-grid">
-        <aside className="control-panel">
-          <div className="panel-label">01 / CAPTURE STYLE</div>
-          <h1>Bring your handwriting in.</h1>
-          <p className="panel-copy">Upload one sample to create a deterministic prototype style representation.</p>
+      <section className="workspace-heading wrap">
+        <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: reduceMotion ? 0 : .55 }}>
+          <p className="eyebrow"><span className="eyebrow-mark" /> WORKSPACE 01 / GENERATION</p>
+          <h1>Give your words<br /><em>a human hand.</em></h1>
+          <p>Save up to five handwriting references, enter your text, and generate a PNG using the pretrained DiffusionPen model. First generation downloads its model weights.</p>
+        </motion.div>
+        <div className="workspace-heading-aside"><div className="status-line"><span className="status-orb" /> {API_BASE ? "Backend configured" : "Local prototype mode"}</div><div className="heading-aside-note">Saved references are stored for future style-model integration; the current renderer does not learn from them.</div></div>
+      </section>
 
-          <label className="upload-box">
-            <input type="file" accept="image/*,.pdf" onChange={handleUpload} />
-            <span className="upload-icon">+</span>
-            <strong>{file ? "Replace sample" : "Upload sample"}</strong>
-            <small>PNG, JPG, PDF · prototype only</small>
+      <section className="studio-layout wrap">
+        <aside className="studio-sidebar">
+          <div className="panel-section-head"><span>01</span><div><h2>Save handwriting samples</h2><p>Choose 1–5 images from the same writer for a future style model.</p></div></div>
+          <label className="upload-zone">
+            <input type="file" accept="image/png,image/jpeg,image/webp" multiple onChange={handleUpload} aria-label="Upload up to five handwriting reference images" />
+            {samplePreview ? <Image src={samplePreview} alt="Preview of the first uploaded handwriting sample" width={1200} height={800} unoptimized className="upload-preview" /> : <span className="upload-symbol">↑</span>}
+            <strong>{files.length ? files[0].name + (files.length > 1 ? " +" + (files.length - 1) + " more" : "") : "Choose handwriting images"}</strong>
+            <small>{files.length ? files.length + " reference " + (files.length === 1 ? "image" : "images") + " selected" : "PNG, JPEG, WEBP · up to five · max 8 MB each"}</small>
+            {files.length > 0 && <span className="upload-replace">Choose another set ↗</span>}
           </label>
-
-          {isAnalyzing && (
-            <div className="progress-card">
-              <div className="scan-line" /><div><span>ANALYZER</span><strong>Extracting style signal…</strong></div>
-            </div>
-          )}
-
-          {style && !isAnalyzing && (
-            <motion.div className="style-card" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
-              <div className="card-head"><span>STYLE READY</span><span className="green-dot" /></div>
-              <strong>{style.styleId}</strong>
-              <div className="meta-grid">
-                <div><span>SOURCE</span><b>{style.fileName}</b></div>
-                <div><span>SAMPLES</span><b>{style.sampleCount}</b></div>
-                <div><span>REP</span><b>prototype-v1</b></div>
-                <div><span>SEED</span><b>{String(style.seed).slice(0, 6)}</b></div>
-              </div>
-            </motion.div>
-          )}
-
-          <div className="divider" />
-          <div className="panel-label">02 / GENERATE</div>
-
-          <label className="field-label">Prototype user</label>
-          <input className="field" value={userId} onChange={(event) => setUserId(event.target.value)} placeholder="demo-user" />
-
-          <label className="field-label">Text</label>
-          <textarea className="field textarea" value={text} onChange={(event) => setText(event.target.value)} maxLength={5000} placeholder="Type what you want written…" />
-
-          {error && <div className="error-box">{error}</div>}
-
-          <button className="button primary full" disabled={isGenerating} onClick={generate}>
-            {isGenerating ? "Authorizing + generating…" : "Generate handwriting"} <span>↗</span>
-          </button>
-
-          <div className="status-line"><span>Status</span><strong>{status}</strong></div>
+          {isAnalyzing && <motion.div className="inline-progress" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}><span className="progress-sweep" /><div><small>{API_BASE ? "SAVE TO SQLITE" : "LOCAL PREVIEW"}</small><strong>Preparing reference images…</strong></div></motion.div>}
+          {style && !isAnalyzing && <motion.div className="sample-record" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
+            <div className="sample-record-top"><span className="small-label">STYLE REFERENCE</span><span className="sample-state">{style.backendStyleId ? "SAVED" : "LOCAL ONLY"}</span></div><b>{style.styleId}</b>
+            <div className="sample-meta"><span>Reference images</span><strong>{style.sampleCount} / 5</strong><span>Total file size</span><strong>{(style.size / 1024).toFixed(1)} KB</strong></div>
+            <p className="sample-storage-note">{style.backendStyleId ? "Image samples and checksums are stored in SQLite for this demo session." : "Images are only in this browser. Configure the backend to save them."} The pretrained DiffusionPen model uses these saved references when you generate.</p>
+            <button className="text-button" onClick={resetSample} type="button">Delete saved references <span>×</span></button>
+          </motion.div>}
+          <div className="sidebar-divider" />
+          <div className="panel-section-head"><span>02</span><div><h2>Write your text</h2><p>Content is hashed before the request flow.</p></div></div>
+          <label className="field-label" htmlFor="prototype-user">Prototype user ID</label><input id="prototype-user" className="field-control" disabled={Boolean(style?.backendStyleId)} value={userId} maxLength={64} onChange={(event) => setUserId(event.target.value)} placeholder="demo-user" />
+          <label className="field-label field-label-spaced" htmlFor="generation-text">Your text <span>{text.length}/5000</span></label><textarea id="generation-text" className="field-control textarea-control" value={text} onChange={(event) => setText(event.target.value)} maxLength={5000} placeholder="Type the words you want to see…" />
+          {error && <div className="feedback-error" role="alert">{error}</div>}
+          <button className="button button-light generate-button" disabled={isGenerating} onClick={generate} type="button">{isGenerating ? <><span className="button-spinner" /> Working…</> : <>Create preview <span>↗</span></>}</button>
+          <p className="sidebar-disclaimer">With the backend enabled, DiffusionPen generates the downloadable handwriting PNG. Without the backend, this page only shows a visual simulation.</p>
         </aside>
 
-        <section className="canvas-panel">
-          <div className="canvas-toolbar">
-            <div><span className="panel-label">LIVE OUTPUT</span><h2>Generation workspace</h2></div>
-            <span className={"mode-chip " + (result?.mode === "backend" ? "is-live" : "")}>
-              {result?.mode === "backend" ? "FASTAPI CONNECTED" : "LOCAL PROTOTYPE"}
-            </span>
-          </div>
-
-          <div className="paper-stage">
-            {!result ? (
-              <div className="empty-state">
-                <div className="empty-doodle">W</div>
-                <h3>Your generated page will land here.</h3>
-                <p>Upload a sample, enter text, then run the generation flow.</p>
-                <div className="flow-mini"><span>capture</span><b>→</b><span>authorize</span><b>→</b><span>generate</span><b>→</b><span>trace</span></div>
-              </div>
+        <section className="studio-canvas" aria-label="Generation preview and provenance">
+          <div className="canvas-header"><div><p className="eyebrow">OUTPUT CANVAS</p><h2>Your page, in progress.</h2></div><span className={"connection-chip " + (result?.mode === "backend" ? "connection-live" : "")}><i /> {result?.mode === "backend" ? "CONTROL LAYER USED" : "VISUAL SIMULATION"}</span></div>
+          <div className="canvas-stage">
+            {!result ? <motion.div className="canvas-empty" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: reduceMotion ? 0 : .4 }}><div className="empty-mark"><span>w</span><i /></div><h3>Room for your words.</h3><p>Your generated page will appear here after you save reference images and create a request.</p><div className="mini-pipeline"><span>references</span><b>→</b><span>model</span><b>→</b><span>handwriting</span></div></motion.div> : result.mode === "backend" && result.imageUrl ? (
+              <motion.div className="generated-image-wrap" initial={{ opacity: 0, y: reduceMotion ? 0 : 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: reduceMotion ? 0 : .45 }}>
+                <img className="generated-image" src={result.imageUrl} alt={"DiffusionPen handwriting preview for: " + text.slice(0, 160)} />
+                <div className="generated-image-caption"><span>{result.modelId}</span><span>{result.wordsGenerated} words · {result.referenceWordsUsed} style crops</span></div>
+              </motion.div>
             ) : (
-              <motion.div className="generated-paper" initial={{ opacity: 0, scale: 0.98, rotate: -0.3 }} animate={{ opacity: 1, scale: 1, rotate: 0 }}>
-                <div className="paper-meta">WRTLYX / {result.generationId}</div>
-                <div className="handwriting-block">
-                  {lines.map((row, rowIndex) => (
-                    <div className="writing-row" key={rowIndex}>
-                      {row.map((word, wordIndex) => {
-                        const jitter = style ? seededValue(style.seed, rowIndex * 7 + wordIndex) : 0.5;
-                        return (
-                          <span
-                            key={word + wordIndex}
-                            style={{
-                              transform: "rotate(" + ((jitter - 0.5) * 2.4) + "deg) translateY(" + ((jitter - 0.5) * 3) + "px)",
-                              letterSpacing: (-0.025 + jitter * 0.025) + "em",
-                            }}
-                          >
-                            {word}
-                          </span>
-                        );
-                      })}
-                    </div>
-                  ))}
-                </div>
-                <div className="paper-footer-note">prototype renderer · style-conditioned simulation</div>
+              <motion.div className="output-paper" initial={{ opacity: 0, y: reduceMotion ? 0 : 16, rotate: -1.4 }} animate={{ opacity: 1, y: 0, rotate: -.3 }} transition={{ duration: reduceMotion ? 0 : .6, ease: [.2,.8,.2,1] }}>
+                <div className="output-paper-top"><span>WRTLYNX / {result.generationId}</span><span>LOCAL DEMO</span></div>
+                <div className="output-writing">{lines.map((row, rowIndex) => <div className="output-writing-row" key={rowIndex}>{row.map((word, wordIndex) => {
+                  const jitter = style ? seededValue(style.seed, rowIndex * 11 + wordIndex) : .5;
+                  return <span key={word + wordIndex} style={{ transform: "rotate(" + ((jitter - .5) * 2.3) + "deg) translateY(" + ((jitter - .5) * 3) + "px)", letterSpacing: (-.025 + jitter * .025) + "em" }}>{word}</span>;
+                })}</div>)}</div>
+                <div className="output-paper-footer"><span>SIMULATED PEN VARIATION</span><span>NOT A MODEL OUTPUT</span></div>
               </motion.div>
             )}
           </div>
-
-          <div className="provenance-panel">
-            <div className="prov-heading">
-              <div><span className="panel-label">03 / PROVENANCE</span><h3>Generation record</h3></div>
-              <span className="lock-tag">BOUND</span>
+          {result && (
+            <div className="preview-export-row">
+              <button className="preview-export-link" type="button" onClick={downloadPreview}>
+                Download {result.mode === "backend" ? "handwriting PNG" : "preview SVG"} <span aria-hidden="true">↓</span>
+              </button>
+              <span>{result.mode === "backend" ? "PNG · DiffusionPen model output" : "SVG · illustrative browser-rendered output"}</span>
             </div>
-            <div className="prov-grid">
-              <div><span>GENERATION</span><b>{result?.generationId ?? "—"}</b></div>
-              <div><span>STYLE</span><b>{style?.styleId ?? "—"}</b></div>
-              <div><span>CONTENT SHA-256</span><b>{result ? result.fingerprint.slice(0, 18) + "…" : "—"}</b></div>
-              <div><span>PROVENANCE DIGEST</span><b>{result ? result.provenanceDigest.slice(0, 18) + "…" : "—"}</b></div>
-            </div>
-            <p className="prototype-note">
-              {result?.mode === "backend"
-                ? "Backend mode: authorization was issued and consumed before the generation record was created."
-                : "Local mode: the UI demonstrates the same intended flow without claiming production-grade security."}
-            </p>
+          )}
+          <div className="provenance-card">
+            <div className="provenance-title"><div><p className="eyebrow">03 / PROVENANCE</p><h3>Request record</h3></div><span className="integrity-tag">SHA-256 <i>✓</i></span></div>
+            <div className="provenance-grid"><div><span>GENERATION ID</span><b>{result?.generationId ?? "Waiting for request"}</b></div><div><span>STYLE REFERENCE</span><b>{style?.styleId ?? "No sample"}</b></div><div><span>CONTENT FINGERPRINT</span><b>{result ? result.fingerprint.slice(0, 18) + "…" : "—"}</b></div><div><span>PROVENANCE DIGEST</span><b>{result ? result.provenanceDigest.slice(0, 18) + "…" : "—"}</b></div></div>
+            <div className="record-bottom"><span className="record-status"><i /> {status}</span><p>{result?.mode === "backend" ? "DiffusionPen generated the PNG using saved reference samples. The backend also consumed the one-time authorization and stored an audit/provenance record." : "Local mode creates a demo fingerprint only. It does not run the neural model or create a persistent backend record."}</p></div>
           </div>
         </section>
-      </div>
+      </section>
+      <footer className="workspace-footer wrap"><span>WritLynxAI / Generation</span><span>Personal style · Controlled use · Provenance</span><Link href="/recognize">Switch to recognition ↗</Link></footer>
     </main>
   );
 }

@@ -58,6 +58,10 @@ class GenerationResponse(BaseModel):
     generation_id: str
     status: str
     provenance_digest: str
+    model_id: str
+    image_url: str
+    words_generated: int
+    reference_words_used: int
 
 
 class ProvenanceResponse(BaseModel):
@@ -76,3 +80,35 @@ class ProvenanceResponse(BaseModel):
 
 class MessageResponse(BaseModel):
     message: str
+
+
+class RecognitionResponse(BaseModel):
+    job_id: str
+    status: str
+    original_filename: str
+    image_sha256: str
+    model_id: str
+    lines_recognized: int
+    transcript: str
+    created_at: datetime
+
+
+class RecognitionJobSummary(BaseModel):
+    job_id: str
+    status: str
+    original_filename: str
+    image_sha256: str
+    model_id: str
+    lines_recognized: int
+    transcript: str
+    created_at: datetime
+
+
+class StyleSampleSummary(BaseModel):
+    sample_id: str
+    style_id: str
+    original_filename: str
+    content_type: str
+    image_sha256: str
+    size_bytes: int
+    created_at: datetime

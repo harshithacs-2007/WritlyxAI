@@ -7,6 +7,10 @@ class Settings(BaseSettings):
     authorization_ttl_seconds: int = 120
     nonce_bytes: int = 24
     cors_origins: str = "http://localhost:3000"
+    htr_model_id: str = "microsoft/trocr-base-handwritten"
+    htr_model_path: str = ""
+    diffusionpen_checkpoint_path: str = ""
+    diffusionpen_style_path: str = ""
 
     model_config = SettingsConfigDict(
         env_prefix="WRITLYNX_",

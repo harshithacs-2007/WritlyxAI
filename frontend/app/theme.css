@@ -1,0 +1,210 @@
+/* Theme switcher shared by the landing page and both workspaces. */
+.theme-toggle {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 2px;
+  padding: 3px;
+  border: 1px solid var(--line-strong);
+  border-radius: 7px;
+  background: var(--bg-raised);
+}
+.theme-option {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  min-height: 28px;
+  padding: 0 8px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--muted-dim);
+  font-size: 9px;
+  transition: color .2s ease, background .2s ease, border-color .2s ease;
+}
+.theme-option span { font-size: 13px; line-height: 1; }
+.theme-option:hover { color: var(--text); }
+.theme-option.is-selected {
+  border-color: var(--line);
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: 0 1px 3px rgba(0,0,0,.06);
+}
+body, .site-shell, .workspace-shell, .recognition-shell {
+  transition: background-color .24s ease, color .24s ease;
+}
+
+/* Light palette: preserve the ink-and-paper identity, but give the app a
+   genuinely light canvas rather than simply inverting the dark UI. */
+:root[data-theme="light"] {
+  color-scheme: light;
+  --bg: #f5f3ed;
+  --bg-raised: #fffefa;
+  --surface: #ffffff;
+  --text: #25241f;
+  --muted: #5c5b53;
+  --muted-dim: #76766e;
+  --line: rgba(36, 34, 28, .13);
+  --line-strong: rgba(36, 34, 28, .23);
+  --accent: #a87835;
+  --accent-light: #8d622e;
+  --green: #4c774b;
+  --red: #a44f42;
+}
+:root[data-theme="light"] body::before {
+  opacity: .045;
+  mix-blend-mode: multiply;
+}
+:root[data-theme="light"] ::selection { background: #ead8b9; color: #24221c; }
+:root[data-theme="light"] .site-shell {
+  background: radial-gradient(ellipse at 83% 5%, rgba(168,120,53,.09), transparent 32rem), var(--bg);
+}
+:root[data-theme="light"] .workspace-shell,
+:root[data-theme="light"] .recognition-shell {
+  background: radial-gradient(ellipse at 75% 0%, rgba(168,120,53,.09), transparent 32rem), var(--bg);
+}
+:root[data-theme="light"] .nav-links { color: #66655d; }
+:root[data-theme="light"] .nav-links a:hover,
+:root[data-theme="light"] .workspace-exit:hover { color: var(--accent-light); }
+:root[data-theme="light"] .hero-description { color: #5f5e56; }
+:root[data-theme="light"] .hero-footnote,
+:root[data-theme="light"] .scroll-cue { color: #77766d; }
+:root[data-theme="light"] .footnote-divider { color: #aaa79c; }
+:root[data-theme="light"] .floating-note {
+  border-color: rgba(45,41,33,.14);
+  background: rgba(255,254,250,.96);
+  color: #4d4b43;
+  box-shadow: 0 12px 40px rgba(48,40,26,.12);
+}
+:root[data-theme="light"] .note-bottom span:last-child { color: #6c6b62; }
+:root[data-theme="light"] .note-bottom b { color: #35342e; }
+:root[data-theme="light"] .button-quiet { color: #45443d; background: rgba(255,255,255,.48); }
+:root[data-theme="light"] .button-quiet:hover,
+:root[data-theme="light"] .button-outline:hover { background: rgba(168,120,53,.08); }
+:root[data-theme="light"] .workflow-card {
+  background: linear-gradient(145deg, rgba(255,255,255,.94), rgba(255,255,255,.64));
+  box-shadow: 0 12px 34px rgba(48,40,26,.035);
+}
+:root[data-theme="light"] .workflow-number,
+:root[data-theme="light"] .visual-caption,
+:root[data-theme="light"] .art-index { color: #77756b; }
+:root[data-theme="light"] .generation-visual {
+  background: radial-gradient(ellipse at 50% 42%, rgba(168,120,53,.13), transparent 52%), #eeece4;
+}
+:root[data-theme="light"] .recognition-visual {
+  background: radial-gradient(ellipse at 50% 48%, rgba(168,120,53,.11), transparent 58%), #eeece4;
+}
+:root[data-theme="light"] .recognition-float {
+  border-color: var(--line-strong);
+  background: rgba(255,254,250,.97);
+  box-shadow: 0 16px 36px rgba(48,40,26,.12);
+}
+:root[data-theme="light"] .recognition-float small { color: #6e6c63; }
+:root[data-theme="light"] .workflow-card-copy p,
+:root[data-theme="light"] .section-intro,
+:root[data-theme="light"] .method-copy>p:not(.eyebrow),
+:root[data-theme="light"] .method-step p,
+:root[data-theme="light"] .language-copy>p:not(.eyebrow),
+:root[data-theme="light"] .recognition-next-copy p { color: #65645b; }
+:root[data-theme="light"] .method-section {
+  background: linear-gradient(110deg, rgba(40,36,28,.025), transparent 46%), #eeece5;
+}
+:root[data-theme="light"] .step-number { background: #fffefa; }
+:root[data-theme="light"] .language-panel {
+  background: radial-gradient(ellipse at 90% 0%, rgba(168,120,53,.10), transparent 65%), #fffefa;
+  box-shadow: 0 14px 36px rgba(48,40,26,.035);
+}
+:root[data-theme="light"] .script-tile { background: rgba(255,255,255,.62); }
+:root[data-theme="light"] .script-tile>small { color: #77746a; }
+:root[data-theme="light"] .site-footer { color: #77756d; }
+:root[data-theme="light"] .site-footer .wordmark { color: #292821; }
+:root[data-theme="light"] .workspace-tabs { background: rgba(255,255,255,.6); }
+:root[data-theme="light"] .workspace-tab { color: #77766d; }
+:root[data-theme="light"] .workspace-tab:hover { color: #33312b; }
+:root[data-theme="light"] .workspace-tab.active { color: #292821; background: #eae6dc; }
+:root[data-theme="light"] .workspace-exit { color: #66655c; }
+:root[data-theme="light"] .workspace-heading>div:first-child>p:not(.eyebrow) { color: #626158; }
+:root[data-theme="light"] .workspace-heading-aside .status-line { color: #46453e; }
+:root[data-theme="light"] .heading-aside-note { color: #74736a; }
+:root[data-theme="light"] .studio-sidebar,
+:root[data-theme="light"] .studio-canvas,
+:root[data-theme="light"] .recognition-source,
+:root[data-theme="light"] .transcript-panel {
+  background: rgba(255,254,250,.83);
+  box-shadow: 0 10px 28px rgba(48,40,26,.035);
+}
+:root[data-theme="light"] .panel-section-head p { color: #6d6b62; }
+:root[data-theme="light"] .upload-zone {
+  background: linear-gradient(140deg, rgba(168,120,53,.06), transparent 72%);
+}
+:root[data-theme="light"] .upload-zone strong { color: #34332d; }
+:root[data-theme="light"] .upload-zone small,
+:root[data-theme="light"] .small-label,
+:root[data-theme="light"] .sample-meta span,
+:root[data-theme="light"] .field-label span,
+:root[data-theme="light"] .sidebar-disclaimer { color: #74736a; }
+:root[data-theme="light"] .inline-progress {
+  background: #f0eee6;
+}
+:root[data-theme="light"] .inline-progress small { color: #747269; }
+:root[data-theme="light"] .inline-progress strong { color: #33322c; }
+:root[data-theme="light"] .sample-record { background: rgba(245,243,237,.75); }
+:root[data-theme="light"] .sample-meta strong { color: #49483f; }
+:root[data-theme="light"] .text-button { color: #5e5c53; }
+:root[data-theme="light"] .text-button:hover { color: var(--accent-light); }
+:root[data-theme="light"] .field-label { color: #55544b; }
+:root[data-theme="light"] .field-control {
+  border-color: var(--line-strong);
+  background: #fffefa;
+  color: #282720;
+}
+:root[data-theme="light"] .field-control:focus { background: #ffffff; }
+:root[data-theme="light"] .field-control::placeholder { color: #89877d; }
+:root[data-theme="light"] .canvas-stage {
+  background: radial-gradient(ellipse at 50% 42%, rgba(80,66,43,.045), transparent 60%);
+}
+:root[data-theme="light"] .canvas-empty p { color: #69685f; }
+:root[data-theme="light"] .mini-pipeline { color: #727066; }
+:root[data-theme="light"] .provenance-card { background: rgba(40,36,28,.025); }
+:root[data-theme="light"] .provenance-grid span { color: #77756b; }
+:root[data-theme="light"] .provenance-grid b { color: #34332d; }
+:root[data-theme="light"] .record-status { color: #46453e; }
+:root[data-theme="light"] .record-bottom p { color: #6d6b62; }
+:root[data-theme="light"] .workspace-footer { color: #77756d; }
+:root[data-theme="light"] .workspace-footer a { color: #895e2a; }
+:root[data-theme="light"] .recognition-drop {
+  background: radial-gradient(ellipse at 50% 40%, rgba(168,120,53,.055), transparent 60%), #f1efe8;
+}
+:root[data-theme="light"] .recognition-drop.has-source { background: #f3f1eb; }
+:root[data-theme="light"] .recognition-drop-prompt strong { color: #34332d; }
+:root[data-theme="light"] .recognition-drop-prompt small { color: #77756c; }
+:root[data-theme="light"] .recognition-image { background: #eeeae0; }
+:root[data-theme="light"] .source-filename { background: rgba(255,254,250,.96); color: #3f3d35; }
+:root[data-theme="light"] .source-info>span { color: #456a42; }
+:root[data-theme="light"] .source-info p { color: #68675e; }
+:root[data-theme="light"] .recognition-notice {
+  background: rgba(168,120,53,.07);
+}
+:root[data-theme="light"] .recognition-notice strong { color: #664821; }
+:root[data-theme="light"] .recognition-notice p { color: #625e53; }
+:root[data-theme="light"] .transcript-footer { background: rgba(40,36,28,.035); }
+:root[data-theme="light"] .transcript-footer strong { color: #34332d; }
+:root[data-theme="light"] .transcript-footer p { color: #65635a; }
+@media(max-width:740px) {
+  .theme-toggle { gap: 1px; padding: 2px; }
+  .theme-option { gap: 3px; min-height: 27px; padding: 0 6px; font-size: 8px; }
+}
+
+:root[data-theme="light"] .eyebrow { color: #6d6b62; }
+:root[data-theme="light"] .button-outline { color: #4a483f; }
+:root[data-theme="light"] .connection-chip { color: #68665d; }
+:root[data-theme="light"] .integrity-tag { color: #805b2f; }
+:root[data-theme="light"] .transcript-tools>span { color: #66645b; }
+@media(max-width:420px) {
+  .theme-option { min-width: 28px; padding-inline: 5px; font-size: 0; }
+  .theme-option span { font-size: 14px; }
+  .workspace-nav { row-gap: 8px; flex-wrap: wrap; padding-block: 9px; }
+  .workspace-nav .workspace-tabs { order: 3; }
+  .workspace-nav .theme-toggle { order: 4; margin-left: auto; }
+}

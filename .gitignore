@@ -1,0 +1,42 @@
+# Local datasets and downloaded model weights (never commit these)
+data/
+datasets/
+models/
+huggingface-cache/
+**/huggingface-cache/
+*.safetensors
+*.ckpt
+*.pt
+*.pth
+*.parquet
+
+# Secrets and local configuration
+.env
+.env.*
+!.env.example
+frontend/.env.local
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+backend/*.db
+backend/*.sqlite
+backend/*.sqlite3
+*.db-journal
+
+# Node / Next.js
+node_modules/
+.next/
+out/
+dist/
+coverage/
+
+# Editor and OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+desktop.ini

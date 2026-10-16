@@ -1,21 +1,55 @@
-# WritlynxAI
+# WritLynxAI
 
-Research prototype for personalized handwriting synthesis with controlled style use and provenance.
+WritLynxAI is a prototype for two handwriting workflows: personalized handwriting generation and handwritten text recognition.
 
-## Prototype
+## Applications
 
-- `index.html` — standalone interactive demo
-- `frontend/` — Next.js prototype application
-- `backend/` — FastAPI + SQLite security/control layer
+- frontend/ — Next.js experience with a live illustrative text preview, generation workspace, English recognition workspace, and persistent Light/Dark themes.
+- backend/ — FastAPI + SQLite control layer plus a pretrained English handwriting-recognition endpoint.
+- index.html — an older standalone browser demo, separate from the Next.js application.
 
-The standalone page is intentionally deterministic and does not claim to be the trained handwriting model.
+## Run locally (Windows PowerShell)
 
-## Deploying the standalone page
+Start the backend in the first terminal:
 
-The repository can be imported into Vercel with the repository root as the project root. No build step is required; Vercel serves `index.html` directly.
+    cd backend
+    py -m venv .venv
+    .\.venv\Scripts\Activate.ps1
+    pip install -r requirements.txt
+    Copy-Item .env.example .env
+    py download_htr_model.py
+    uvicorn app.main:app --reload
 
-The expected user flow is:
+Start the frontend in a second terminal from the repository root:
 
-Capture -> Generate -> Provenance
+    cd frontend
+    npm install
+    Copy-Item .env.example .env.local
+    npm run dev
 
-The backend remains a separate FastAPI service for the Review II security-control demonstration.
+Open http://localhost:3000. The frontend's local environment example points to http://127.0.0.1:8000.
+
+## Current functionality
+
+- **English recognition:** uploads a PNG/JPEG/WEBP page to the FastAPI endpoint, runs the pretrained TrOCR model, returns an editable transcript, and stores a recognition job/checksum/transcript in SQLite. The recognition source image is not retained.
+- **Style reference storage:** the Generation workspace can store up to five user-selected handwriting reference images (8 MB each) in SQLite, scoped to a demo user/session/style.
+- **Recognition history:** lists recent jobs belonging to the current prototype session so a transcript can be reopened and edited.
+- **Generation integration:** the backend `/generate` route is wired to a DiffusionPen inference service and stores generated PNG artifacts when inference succeeds. This path is experimental and has not yet been verified end-to-end on a local machine; the no-backend frontend fallback is an illustrative simulation, not model-generated handwriting.
+- **Themes and motion:** Light/Dark preference persists across routes; scroll motion is reduced when a user prefers reduced motion.
+
+## Model and storage considerations
+
+The current recognition API uses microsoft/trocr-base-handwritten, MIT-licensed and fine-tuned on IAM. Its safetensors checkpoint is about 1.33 GB. To keep data alongside the code, set WRITLYNX_HTR_MODEL_PATH in backend/.env to `C:/Projects/WritLynxAI/data/TrOCR`, then run `py download_htr_model.py` to fill that folder. To use saved DiffusionPen weights, set WRITLYNX_DIFFUSIONPEN_CHECKPOINT_PATH and WRITLYNX_DIFFUSIONPEN_STYLE_PATH to the two local .pt/.pth files in backend/.env. First run needs network and disk space; CPU inference may be slow. TrOCR is designed for single text-line input; the prototype performs simple line segmentation and is best with clear, single-column English handwriting. Review every transcript.
+
+The SQLite database already used by the project adds recognition_jobs and style_samples tables. Recognition jobs store transcript text, image checksum, filename, model ID, line count and status but not the raw recognition page; the style_samples table retains images explicitly selected as Generation references, until the user removes them. Configure WRITLYNX_DATABASE_URL to move the database file.
+
+## Prototype boundaries
+
+- English recognition is a pretrained baseline, not a new model trained by this team. The current recognition endpoint is English-only; broader Indic handwriting requires a compatible multilingual Indic model adapter and script-specific tests. Candidate model sources are documented in backend/README.md.
+- DiffusionPen generation is integrated experimentally but is not yet confirmed to run successfully end-to-end on a local machine; reference images must contain usable handwriting words.
+- The no-backend generation fallback is an illustrative visual simulation, not AI-generated handwriting.
+- The FastAPI service and user ID flow are prototype controls, not production authentication infrastructure.
+- For a Vercel deployment, set the frontend Root Directory to frontend. The backend must separately run somewhere with enough disk/RAM to load TrOCR; configuring a URL does not deploy the model server.
+- The GitHub Pages workflow builds the frontend app on pushes to main.
+
+See backend/README.md for API, model and database details.
