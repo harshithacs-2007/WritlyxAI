@@ -195,3 +195,16 @@ body, .site-shell, .workspace-shell, .recognition-shell {
   .theme-toggle { gap: 1px; padding: 2px; }
   .theme-option { gap: 3px; min-height: 27px; padding: 0 6px; font-size: 8px; }
 }
+
+:root[data-theme="light"] .eyebrow { color: #6d6b62; }
+:root[data-theme="light"] .button-outline { color: #4a483f; }
+:root[data-theme="light"] .connection-chip { color: #68665d; }
+:root[data-theme="light"] .integrity-tag { color: #805b2f; }
+:root[data-theme="light"] .transcript-tools>span { color: #66645b; }
+@media(max-width:420px) {
+  .theme-option { min-width: 28px; padding-inline: 5px; font-size: 0; }
+  .theme-option span { font-size: 14px; }
+  .workspace-nav { row-gap: 8px; flex-wrap: wrap; padding-block: 9px; }
+  .workspace-nav .workspace-tabs { order: 3; }
+  .workspace-nav .theme-toggle { order: 4; margin-left: auto; }
+}
