@@ -51,7 +51,7 @@ def _load_model() -> tuple[Any, Any, Any]:
                 MODEL_SOURCE, local_files_only=local_model
             )
             model = VisionEncoderDecoderModel.from_pretrained(
-                MODEL_ID, local_files_only=local_model
+                MODEL_SOURCE, local_files_only=local_model
             )
             device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
             model.to(device)
