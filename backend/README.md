@@ -27,7 +27,7 @@ FastAPI + SQLite prototype for generation authorization/provenance and English h
 | POST | /recognize | Recognize English handwriting from a PNG/JPEG/WEBP image |
 | GET | /recognitions | List recent recognition jobs belonging to an active session |
 
-The style-reference endpoint accepts multipart fields files (1–5), user_id, and session_id. It stores validated PNG/JPEG/WEBP image bytes and a SHA-256 digest; the user can delete saved references from the Generation workspace. The generation model is not connected yet, so persisted style samples are groundwork for the next step.
+The style-reference endpoint accepts multipart fields files (1–5), user_id, and session_id. It stores validated PNG/JPEG/WEBP image bytes and a SHA-256 digest; the user can delete saved references from the Generation workspace. The `/generate` endpoint is wired to an experimental DiffusionPen inference service, but successful end-to-end generation has not yet been verified on a local machine.
 
 The recognition endpoint accepts multipart form fields file, user_id, and session_id. It returns an editable transcript, model identifier, SHA-256 of the input image, number of processed lines, and the persisted job ID. Recent results can be listed with user_id and session_id query parameters. Swagger UI is available at /docs.
 
@@ -41,7 +41,7 @@ The recognition endpoint accepts multipart form fields file, user_id, and sessio
     py download_htr_model.py
     uvicorn app.main:app --reload
 
-The frontend expects NEXT_PUBLIC_API_BASE_URL=http://127.0.0.1:8000 in frontend/.env.local. To save model files in a specific folder, add `WRITLYNX_HTR_MODEL_PATH=C:/WritLynxAI-data/TrOCR` to `backend/.env` before running `py download_htr_model.py`; the recognizer will load from that folder. If unset, it uses the default Hugging Face cache.
+The frontend expects NEXT_PUBLIC_API_BASE_URL=http://127.0.0.1:8000 in frontend/.env.local. To save model files alongside the project, add `WRITLYNX_HTR_MODEL_PATH=C:/Projects/WritLynxAI/data/TrOCR` to `backend/.env` before running `py download_htr_model.py`; the recognizer will load from that folder. If unset, it uses the default Hugging Face cache.
 
 ## English HTR model
 
