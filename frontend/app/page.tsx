@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { motion, useReducedMotion, useScroll, useTransform } from "framer-motion";
 import { useRef } from "react";
+import { ThemeToggle } from "./theme";
 
 const fadeUp = { hidden: { opacity: 0, y: 24 }, visible: { opacity: 1, y: 0 } };
 
@@ -23,6 +24,7 @@ export default function Home() {
       <nav className="site-nav wrap" aria-label="Main navigation">
         <Link className="wordmark" href="/" aria-label="WritLynxAI home"><span className="wordmark-symbol">w<span>.</span></span><span>WritLynx<span className="wordmark-ai">AI</span></span></Link>
         <div className="nav-links"><a href="#workflows">Workflows</a><a href="#method">Method</a><Link href="/recognize">Recognition</Link></div>
+        <ThemeToggle />
         <Link className="nav-cta" href="/studio">Open studio <span aria-hidden="true">↗</span></Link>
       </nav>
 
