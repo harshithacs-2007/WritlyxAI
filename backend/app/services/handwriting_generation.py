@@ -94,7 +94,8 @@ def _load_models() -> tuple[Any, Any, Any, Any, Any, Any]:
             if not unet_checkpoint.is_file() or not style_checkpoint.is_file():
                 raise FileNotFoundError("Official DiffusionPen checkpoint files were not found.")
 
-            device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+            cuda_ready = torch.cuda.is_available() and torch.cuda.get_device_properties(0).total_memory >= 8 * 1024 ** 3
+            device = torch.device("cuda" if cuda_ready else "cpu")
             tokenizer = CanineTokenizer.from_pretrained(TEXT_ENCODER_REPO)
             text_encoder = CanineModel.from_pretrained(TEXT_ENCODER_REPO, use_safetensors=True)
             args = SimpleNamespace(interpolation=False, mix_rate=None)
