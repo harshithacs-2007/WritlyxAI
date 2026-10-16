@@ -7,7 +7,7 @@ import { motion, useReducedMotion } from "framer-motion";
 import { ThemeToggle } from "../theme";
 
 type Mode = "mock" | "backend";
-type StyleMeta = { styleId: string; seed: number; fileName: string; size: number; sampleCount: number };
+type StyleMeta = { styleId: string; backendStyleId?: string; sampleIds?: string[]; seed: number; fileName: string; size: number; sampleCount: number };
 type Result = { generationId: string; fingerprint: string; provenanceDigest: string; mode: Mode };
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, "");
 
@@ -38,7 +38,7 @@ function escapeXml(value: string) {
 
 export default function StudioPage() {
   const reduceMotion = useReducedMotion();
-  const [file, setFile] = useState<File | null>(null);
+  const [files, setFiles] = useState<File[]>([]);
   const [samplePreview, setSamplePreview] = useState("");
   const [style, setStyle] = useState<StyleMeta | null>(null);
   const [text, setText] = useState("Make it look like I wrote it.");
@@ -56,11 +56,12 @@ export default function StudioPage() {
   }, []);
 
   useEffect(() => {
-    if (!file || !file.type.startsWith("image/")) { setSamplePreview(""); return; }
-    const objectUrl = URL.createObjectURL(file);
+    const firstFile = files[0];
+    if (!firstFile || !firstFile.type.startsWith("image/")) { setSamplePreview(""); return; }
+    const objectUrl = URL.createObjectURL(firstFile);
     setSamplePreview(objectUrl);
     return () => URL.revokeObjectURL(objectUrl);
-  }, [file]);
+  }, [files]);
 
   const lines = useMemo(() => {
     const words = text.trim().split(/\s+/).filter(Boolean).slice(0, 48);
@@ -86,19 +87,83 @@ export default function StudioPage() {
   }, [lines]);
 
   const handleUpload = async (event: ChangeEvent<HTMLInputElement>) => {
-    const selected = event.target.files?.[0];
-    if (!selected) return;
+    const selectedFiles = Array.from(event.target.files ?? []);
+    event.target.value = "";
+    if (!selectedFiles.length) return;
+    if (selectedFiles.length > 5) {
+      setError("Choose up to five reference images from the same writer.");
+      return;
+    }
+    if (selectedFiles.some((selected) => !["image/png", "image/jpeg", "image/webp"].includes(selected.type))) {
+      setError("Use PNG, JPEG, or WEBP handwriting images.");
+      return;
+    }
+    if (selectedFiles.some((selected) => selected.size > 8 * 1024 * 1024)) {
+      setError("Each reference image must be 8 MB or smaller.");
+      return;
+    }
+
     setError("");
     setResult(null);
-    setFile(selected);
+    setFiles(selectedFiles);
+    setStyle(null);
     setIsAnalyzing(true);
-    setStatus("Preparing sample preview");
-    const fingerprint = await sha256(selected.name + ":" + selected.size + ":" + selected.lastModified);
-    const seed = parseInt(fingerprint.slice(0, 8), 16) || 1;
-    await new Promise((resolve) => setTimeout(resolve, 380));
-    setStyle({ styleId: "STYLE-" + fingerprint.slice(0, 6).toUpperCase(), seed, fileName: selected.name, size: selected.size, sampleCount: 1 });
-    setStatus("Sample loaded · encoder not connected");
-    setIsAnalyzing(false);
+    setStatus("Preparing handwriting references");
+
+    try {
+      const fingerprint = await sha256(
+        selectedFiles.map((selected) => selected.name + ":" + selected.size + ":" + selected.lastModified).join("|")
+      );
+      const seed = parseInt(fingerprint.slice(0, 8), 16) || 1;
+      let backendStyleId: string | undefined;
+      let sampleIds: string[] | undefined;
+
+      if (API_BASE) {
+        const session = await ensureBackendSession();
+        if (!session) throw new Error("A backend session could not be created.");
+        const styleResponse = await postJSON<{ style_id: string }>("/styles", {
+          user_id: userId.trim(),
+          session_id: session,
+          parameters: { sample_count: selectedFiles.length, source_size: selectedFiles.reduce((sum, selected) => sum + selected.size, 0) },
+          representation_version: "style-reference-images-v1",
+        });
+        const form = new FormData();
+        form.append("user_id", userId.trim());
+        form.append("session_id", session);
+        selectedFiles.forEach((selected) => form.append("files", selected, selected.name));
+        const uploadResponse = await fetch(API_BASE + "/styles/" + encodeURIComponent(styleResponse.style_id) + "/samples", {
+          method: "POST",
+          body: form,
+        });
+        const uploadData = await uploadResponse.json().catch(() => ({}));
+        if (!uploadResponse.ok) {
+          throw new Error(uploadData.detail || "Could not save the handwriting references.");
+        }
+        backendStyleId = styleResponse.style_id;
+        sampleIds = (uploadData as Array<{ sample_id: string }>).map((item) => item.sample_id);
+      } else {
+        await new Promise((resolve) => setTimeout(resolve, 240));
+      }
+
+      const totalSize = selectedFiles.reduce((sum, selected) => sum + selected.size, 0);
+      setStyle({
+        styleId: "STYLE-" + fingerprint.slice(0, 6).toUpperCase(),
+        backendStyleId,
+        sampleIds,
+        seed,
+        fileName: selectedFiles[0].name,
+        size: totalSize,
+        sampleCount: selectedFiles.length,
+      });
+      setStatus(API_BASE
+        ? "References saved in SQLite · style encoder not connected"
+        : "References loaded locally · style encoder not connected");
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Could not prepare the handwriting references.");
+      setStatus("Reference setup blocked");
+    } finally {
+      setIsAnalyzing(false);
+    }
   };
 
   const ensureBackendSession = async () => {
