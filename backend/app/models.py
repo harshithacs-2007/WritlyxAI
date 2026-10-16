@@ -110,3 +110,25 @@ class AuditEvent(Base):
     generation_id: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
     metadata_json: Mapped[str] = mapped_column(Text, default="{}", nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
+
+
+class RecognitionJob(Base):
+    """Small persistence record for English HTR; source image bytes are never stored."""
+
+    __tablename__ = "recognition_jobs"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    user_id: Mapped[str] = mapped_column(
+        ForeignKey("users.id"), nullable=False, index=True
+    )
+    session_id: Mapped[str] = mapped_column(
+        ForeignKey("sessions.id"), nullable=False, index=True
+    )
+    original_filename: Mapped[str] = mapped_column(String(255), nullable=False)
+    image_sha256: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    model_id: Mapped[str] = mapped_column(String(255), nullable=False)
+    status: Mapped[str] = mapped_column(String(16), nullable=False, index=True)
+    transcript: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    lines_recognized: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    error_code: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
