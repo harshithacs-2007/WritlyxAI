@@ -159,8 +159,8 @@ export default function StudioPage() {
         sampleCount: selectedFiles.length,
       });
       setStatus(API_BASE
-        ? "References saved in SQLite · style encoder not connected"
-        : "References loaded locally · style encoder not connected");
+        ? "References saved in SQLite · ready for DiffusionPen"
+        : "References loaded locally · backend model required");
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Could not prepare the handwriting references.");
       setStatus("Reference setup blocked");
@@ -293,7 +293,7 @@ export default function StudioPage() {
         <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: reduceMotion ? 0 : .55 }}>
           <p className="eyebrow"><span className="eyebrow-mark" /> WORKSPACE 01 / GENERATION</p>
           <h1>Give your words<br /><em>a human hand.</em></h1>
-          <p>Load a handwriting sample, enter your text, and inspect the generation flow. Style encoding and the trained handwriting model are not yet connected.</p>
+          <p>Save up to five handwriting references, enter your text, and generate a PNG using the pretrained DiffusionPen model. First generation downloads its model weights.</p>
         </motion.div>
         <div className="workspace-heading-aside"><div className="status-line"><span className="status-orb" /> {API_BASE ? "Backend configured" : "Local prototype mode"}</div><div className="heading-aside-note">Saved references are stored for future style-model integration; the current renderer does not learn from them.</div></div>
       </section>
@@ -312,7 +312,7 @@ export default function StudioPage() {
           {style && !isAnalyzing && <motion.div className="sample-record" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
             <div className="sample-record-top"><span className="small-label">STYLE REFERENCE</span><span className="sample-state">{style.backendStyleId ? "SAVED" : "LOCAL ONLY"}</span></div><b>{style.styleId}</b>
             <div className="sample-meta"><span>Reference images</span><strong>{style.sampleCount} / 5</strong><span>Total file size</span><strong>{(style.size / 1024).toFixed(1)} KB</strong></div>
-            <p className="sample-storage-note">{style.backendStyleId ? "Image samples and checksums are stored in SQLite for this demo session." : "Images are only in this browser. Configure the backend to save them."} The style-generation model is not connected yet.</p>
+            <p className="sample-storage-note">{style.backendStyleId ? "Image samples and checksums are stored in SQLite for this demo session." : "Images are only in this browser. Configure the backend to save them."} The pretrained DiffusionPen model uses these saved references when you generate.</p>
             <button className="text-button" onClick={resetSample} type="button">Delete saved references <span>×</span></button>
           </motion.div>}
           <div className="sidebar-divider" />
@@ -321,7 +321,7 @@ export default function StudioPage() {
           <label className="field-label field-label-spaced" htmlFor="generation-text">Your text <span>{text.length}/5000</span></label><textarea id="generation-text" className="field-control textarea-control" value={text} onChange={(event) => setText(event.target.value)} maxLength={5000} placeholder="Type the words you want to see…" />
           {error && <div className="feedback-error" role="alert">{error}</div>}
           <button className="button button-light generate-button" disabled={isGenerating} onClick={generate} type="button">{isGenerating ? <><span className="button-spinner" /> Working…</> : <>Create preview <span>↗</span></>}</button>
-          <p className="sidebar-disclaimer">The current paper preview uses deterministic browser styling. It is not AI-generated handwriting.</p>
+          <p className="sidebar-disclaimer">With the backend enabled, DiffusionPen generates the downloadable handwriting PNG. Without the backend, this page only shows a visual simulation.</p>
         </aside>
 
         <section className="studio-canvas" aria-label="Generation preview and provenance">
@@ -354,7 +354,7 @@ export default function StudioPage() {
           <div className="provenance-card">
             <div className="provenance-title"><div><p className="eyebrow">03 / PROVENANCE</p><h3>Request record</h3></div><span className="integrity-tag">SHA-256 <i>✓</i></span></div>
             <div className="provenance-grid"><div><span>GENERATION ID</span><b>{result?.generationId ?? "Waiting for request"}</b></div><div><span>STYLE REFERENCE</span><b>{style?.styleId ?? "No sample"}</b></div><div><span>CONTENT FINGERPRINT</span><b>{result ? result.fingerprint.slice(0, 18) + "…" : "—"}</b></div><div><span>PROVENANCE DIGEST</span><b>{result ? result.provenanceDigest.slice(0, 18) + "…" : "—"}</b></div></div>
-            <div className="record-bottom"><span className="record-status"><i /> {status}</span><p>{result?.mode === "backend" ? "FastAPI authorization was issued and consumed; the backend stored a prototype provenance record." : "Local mode creates a demo fingerprint only. No backend authorization or persistent record is claimed."}</p></div>
+            <div className="record-bottom"><span className="record-status"><i /> {status}</span><p>{result?.mode === "backend" ? "DiffusionPen generated the PNG using saved reference samples. The backend also consumed the one-time authorization and stored an audit/provenance record." : "Local mode creates a demo fingerprint only. It does not run the neural model or create a persistent backend record."}</p></div>
           </div>
         </section>
       </section>
