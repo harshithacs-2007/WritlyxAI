@@ -134,6 +134,22 @@ class StyleSample(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
 
 
+class GenerationArtifact(Base):
+    """PNG output from the pretrained handwriting generator."""
+
+    __tablename__ = "generation_artifacts"
+
+    generation_id: Mapped[str] = mapped_column(
+        ForeignKey("generations.id", ondelete="CASCADE"), primary_key=True
+    )
+    model_id: Mapped[str] = mapped_column(String(255), nullable=False)
+    original_text: Mapped[str] = mapped_column(Text, nullable=False)
+    image_bytes: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
+    words_generated: Mapped[int] = mapped_column(Integer, nullable=False)
+    reference_words_used: Mapped[int] = mapped_column(Integer, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
+
+
 class RecognitionJob(Base):
     """Small persistence record for English HTR; source image bytes are never stored."""
 
