@@ -39,7 +39,7 @@ Open http://localhost:3000. The frontend's local environment example points to h
 
 ## Model and storage considerations
 
-The current recognition API uses microsoft/trocr-base-handwritten, MIT-licensed and fine-tuned on IAM. Its safetensors checkpoint is about 1.33 GB. Set WRITLYNX_HTR_MODEL_PATH in backend/.env to a folder such as C:/WritLynxAI-data/TrOCR if you prefer to save the model there, then run `py download_htr_model.py`. First run needs network and disk space; CPU inference may be slow. TrOCR is designed for single text-line input; the prototype performs simple line segmentation and is best with clear, single-column English handwriting. Review every transcript.
+The current recognition API uses microsoft/trocr-base-handwritten, MIT-licensed and fine-tuned on IAM. Its safetensors checkpoint is about 1.33 GB. Set WRITLYNX_HTR_MODEL_PATH in backend/.env to `C:/WritLynxAI-data/TrOCR`, then run `py download_htr_model.py` to fill that folder. To use the saved DiffusionPen weights, set WRITLYNX_DIFFUSIONPEN_CHECKPOINT_PATH and WRITLYNX_DIFFUSIONPEN_STYLE_PATH to the two local .pt/.pth files in backend/.env. First run needs network and disk space; CPU inference may be slow. TrOCR is designed for single text-line input; the prototype performs simple line segmentation and is best with clear, single-column English handwriting. Review every transcript.
 
 The SQLite database already used by the project adds recognition_jobs and style_samples tables. Recognition jobs store transcript text, image checksum, filename, model ID, line count and status but not the raw recognition page; the style_samples table retains images explicitly selected as Generation references, until the user removes them. Configure WRITLYNX_DATABASE_URL to move the database file.
 
