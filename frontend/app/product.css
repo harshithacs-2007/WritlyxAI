@@ -78,13 +78,6 @@
 .product-tool-link { display: flex; align-items: center; justify-content: space-between; gap: 18px; margin-top: 20px; padding-top: 14px; border-top: 1px solid var(--line); color: var(--accent-light); font-size: 9px; font-weight: 650; }
 .product-tool-link span { font-size: 15px; transition: transform .2s ease; }
 .product-tool-link:hover span { transform: translate(3px,-2px); }
-.product-bottom { display: flex; align-items: center; gap: 20px; padding-block: 23px; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
-.product-bottom-mark { flex: 0 0 auto; display: grid; place-items: center; width: 43px; height: 43px; border: 1px solid rgba(212,175,117,.38); border-radius: 13px 13px 13px 4px; color: var(--accent-light); font: italic 26px var(--display); }
-.product-bottom>div:nth-child(2) { flex: 1; min-width: 0; }
-.product-bottom h2 { margin: 0; font: 400 20px var(--display); letter-spacing: -.025em; }
-.product-bottom p { max-width: 630px; margin: 6px 0 0; color: var(--muted); font-size: 9px; line-height: 1.8; }
-.product-bottom-link { flex: 0 0 auto; color: var(--accent-light); font-size: 9px; font-weight: 650; }
-.product-bottom-link:hover { text-decoration: underline; text-underline-offset: 3px; }
 .product-footer { min-height: 76px; display: flex; align-items: center; justify-content: space-between; gap: 20px; color: var(--muted-dim); }
 .product-footer>span { font-size: 7px; letter-spacing: .12em; }
 .product-footer>div { display: flex; gap: 18px; font-size: 9px; }
@@ -128,8 +121,6 @@
   .product-tool-card h3 { font-size: 22px; }
   .product-tool-card p { font-size: 10px; }
   .product-tool-meta { gap: 5px; }
-  .product-bottom { align-items: flex-start; }
-  .product-bottom-link { align-self: center; }
   .product-footer { flex-wrap: wrap; padding-block: 17px; }
 }
 @media(max-width:520px) {
@@ -154,9 +145,6 @@
   .product-tool-list { grid-template-columns: 1fr; }
   .product-tool-card { padding: 19px; }
   .product-tool-card h3 { font-size: 25px; }
-  .product-bottom { display: grid; grid-template-columns: auto 1fr; gap: 13px; }
-  .product-bottom h2 { font-size: 18px; }
-  .product-bottom-link { grid-column: 2; justify-self: start; }
   .product-footer>span { order: 3; width: 100%; }
   .product-footer>div { gap: 11px; }
 }
