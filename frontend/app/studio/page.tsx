@@ -327,9 +327,14 @@ export default function StudioPage() {
         <section className="studio-canvas" aria-label="Generation preview and provenance">
           <div className="canvas-header"><div><p className="eyebrow">OUTPUT CANVAS</p><h2>Your page, in progress.</h2></div><span className={"connection-chip " + (result?.mode === "backend" ? "connection-live" : "")}><i /> {result?.mode === "backend" ? "CONTROL LAYER USED" : "VISUAL SIMULATION"}</span></div>
           <div className="canvas-stage">
-            {!result ? <motion.div className="canvas-empty" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: reduceMotion ? 0 : .4 }}><div className="empty-mark"><span>w</span><i /></div><h3>Room for your words.</h3><p>Your preview will appear here after you load a sample and create a request.</p><div className="mini-pipeline"><span>sample</span><b>→</b><span>authorize</span><b>→</b><span>preview</span><b>→</b><span>trace</span></div></motion.div> : (
-              <motion.div className="output-paper" initial={{ opacity: 0, y: 16, rotate: -1.4 }} animate={{ opacity: 1, y: 0, rotate: -.3 }} transition={{ duration: reduceMotion ? 0 : .6, ease: [.2,.8,.2,1] }}>
-                <div className="output-paper-top"><span>WRTLYNX / {result.generationId}</span><span>WORKING PROTOTYPE</span></div>
+            {!result ? <motion.div className="canvas-empty" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: reduceMotion ? 0 : .4 }}><div className="empty-mark"><span>w</span><i /></div><h3>Room for your words.</h3><p>Your generated page will appear here after you save reference images and create a request.</p><div className="mini-pipeline"><span>references</span><b>→</b><span>model</span><b>→</b><span>handwriting</span></div></motion.div> : result.mode === "backend" && result.imageUrl ? (
+              <motion.div className="generated-image-wrap" initial={{ opacity: 0, y: reduceMotion ? 0 : 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: reduceMotion ? 0 : .45 }}>
+                <img className="generated-image" src={result.imageUrl} alt={"DiffusionPen handwriting preview for: " + text.slice(0, 160)} />
+                <div className="generated-image-caption"><span>{result.modelId}</span><span>{result.wordsGenerated} words · {result.referenceWordsUsed} style crops</span></div>
+              </motion.div>
+            ) : (
+              <motion.div className="output-paper" initial={{ opacity: 0, y: reduceMotion ? 0 : 16, rotate: -1.4 }} animate={{ opacity: 1, y: 0, rotate: -.3 }} transition={{ duration: reduceMotion ? 0 : .6, ease: [.2,.8,.2,1] }}>
+                <div className="output-paper-top"><span>WRTLYNX / {result.generationId}</span><span>LOCAL DEMO</span></div>
                 <div className="output-writing">{lines.map((row, rowIndex) => <div className="output-writing-row" key={rowIndex}>{row.map((word, wordIndex) => {
                   const jitter = style ? seededValue(style.seed, rowIndex * 11 + wordIndex) : .5;
                   return <span key={word + wordIndex} style={{ transform: "rotate(" + ((jitter - .5) * 2.3) + "deg) translateY(" + ((jitter - .5) * 3) + "px)", letterSpacing: (-.025 + jitter * .025) + "em" }}>{word}</span>;
@@ -340,14 +345,10 @@ export default function StudioPage() {
           </div>
           {result && (
             <div className="preview-export-row">
-              <a
-                className="preview-export-link"
-                href={"data:image/svg+xml;charset=utf-8," + encodeURIComponent(svgPreview)}
-                download="writlynxai-preview.svg"
-              >
-                Download preview <span aria-hidden="true">↓</span>
-              </a>
-              <span>SVG · illustrative browser-rendered output</span>
+              <button className="preview-export-link" type="button" onClick={downloadPreview}>
+                Download {result.mode === "backend" ? "handwriting PNG" : "preview SVG"} <span aria-hidden="true">↓</span>
+              </button>
+              <span>{result.mode === "backend" ? "PNG · DiffusionPen model output" : "SVG · illustrative browser-rendered output"}</span>
             </div>
           )}
           <div className="provenance-card">
