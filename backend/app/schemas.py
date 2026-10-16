@@ -98,3 +98,13 @@ class RecognitionJobSummary(BaseModel):
     lines_recognized: int
     transcript: str
     created_at: datetime
+
+
+class StyleSampleSummary(BaseModel):
+    sample_id: str
+    style_id: str
+    original_filename: str
+    content_type: str
+    image_sha256: str
+    size_bytes: int
+    created_at: datetime
