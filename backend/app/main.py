@@ -1,13 +1,15 @@
+import hashlib
 import json
+from pathlib import Path
 from uuid import uuid4
 
-from fastapi import Depends, FastAPI, HTTPException, Query, status
+from fastapi import Depends, FastAPI, File, Form, HTTPException, Query, UploadFile, status
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.database import Base, engine, get_db
-from app.models import AuditEvent, Generation
+from app.models import AuditEvent, Generation, RecognitionJob
 from app.schemas import (
     AuthorizationRequest,
     AuthorizationResponse,
@@ -15,6 +17,8 @@ from app.schemas import (
     GenerationResponse,
     MessageResponse,
     ProvenanceResponse,
+    RecognitionJobSummary,
+    RecognitionResponse,
     SessionCreateRequest,
     SessionResponse,
     StyleCreateRequest,
@@ -23,6 +27,16 @@ from app.schemas import (
 from app.security.authorization import consume_authorization, issue_authorization
 from app.security.sessions import create_session, require_active_session
 from app.services.provenance import build_provenance_digest
+from app.services.handwriting_recognition import (
+    MAX_IMAGE_PIXELS,
+    MAX_LINES_PER_PAGE,
+    MODEL_ID,
+    InvalidHandwritingImage,
+    RecognitionModelUnavailable,
+    recognize_english_page,
+)
+
+MAX_RECOGNITION_UPLOAD_BYTES = 8 * 1024 * 1024
 from app.services.style_service import create_style, revoke_style
 
 
@@ -71,6 +85,148 @@ def audit(
 @app.get("/health", response_model=MessageResponse)
 def health() -> MessageResponse:
     return MessageResponse(message="WritlynxAI backend is running")
+
+
+@app.post("/recognize", response_model=RecognitionResponse)
+def recognize_endpoint(
+    file: UploadFile = File(...),
+    user_id: str = Form(min_length=1, max_length=64),
+    session_id: str = Form(min_length=1, max_length=64),
+    db: Session = Depends(get_db),
+) -> RecognitionResponse:
+    """Run English TrOCR on a handwriting page and store transcript metadata only."""
+    try:
+        require_active_session(db, user_id, session_id)
+        if not file.content_type or not file.content_type.lower().startswith("image/"):
+            raise HTTPException(
+                status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+                detail="Upload a PNG, JPEG, or WEBP image.",
+            )
+        image_bytes = file.file.read(MAX_RECOGNITION_UPLOAD_BYTES + 1)
+    finally:
+        file.file.close()
+
+    if not image_bytes:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="The uploaded image is empty.")
+    if len(image_bytes) > MAX_RECOGNITION_UPLOAD_BYTES:
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail="Image is too large. The limit is 8 MB per upload.",
+        )
+
+    image_digest = hashlib.sha256(image_bytes).hexdigest()
+    safe_name = Path((file.filename or "handwriting-image").replace("\\", "/")).name
+    safe_name = safe_name[:255] or "handwriting-image"
+    job = RecognitionJob(
+        id=f"rec_{uuid4().hex}",
+        user_id=user_id,
+        session_id=session_id,
+        original_filename=safe_name,
+        image_sha256=image_digest,
+        model_id=MODEL_ID,
+        status="PROCESSING",
+        transcript="",
+        lines_recognized=0,
+    )
+    db.add(job)
+    db.commit()
+    db.refresh(job)
+
+    try:
+        prediction = recognize_english_page(image_bytes)
+    except InvalidHandwritingImage as exc:
+        job.status = "FAILED"
+        job.error_code = "INVALID_IMAGE"
+        audit(
+            db, "RECOGNITION_FAILED", user_id=user_id, session_id=session_id,
+            metadata={"job_id": job.id, "reason": job.error_code},
+        )
+        db.commit()
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=str(exc),
+        ) from exc
+    except RecognitionModelUnavailable as exc:
+        job.status = "FAILED"
+        job.error_code = "MODEL_UNAVAILABLE"
+        audit(
+            db, "RECOGNITION_FAILED", user_id=user_id, session_id=session_id,
+            metadata={"job_id": job.id, "reason": job.error_code, "model_id": MODEL_ID},
+        )
+        db.commit()
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=str(exc),
+        ) from exc
+    except Exception as exc:
+        job.status = "FAILED"
+        job.error_code = "INFERENCE_ERROR"
+        audit(
+            db, "RECOGNITION_FAILED", user_id=user_id, session_id=session_id,
+            metadata={"job_id": job.id, "reason": job.error_code},
+        )
+        db.commit()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Recognition failed unexpectedly. Check backend logs and retry with a smaller image.",
+        ) from exc
+
+    job.status = "COMPLETED"
+    job.transcript = prediction["transcript"]
+    job.lines_recognized = int(prediction["lines_recognized"])
+    audit(
+        db, "RECOGNITION_COMPLETED", user_id=user_id, session_id=session_id,
+        metadata={
+            "job_id": job.id,
+            "model_id": job.model_id,
+            "image_sha256": job.image_sha256,
+            "lines_recognized": job.lines_recognized,
+        },
+    )
+    db.commit()
+    db.refresh(job)
+
+    return RecognitionResponse(
+        job_id=job.id,
+        status=job.status,
+        original_filename=job.original_filename,
+        image_sha256=job.image_sha256,
+        model_id=job.model_id,
+        lines_recognized=job.lines_recognized,
+        transcript=job.transcript,
+        created_at=job.created_at,
+    )
+
+
+@app.get("/recognitions", response_model=list[RecognitionJobSummary])
+def list_recognitions_endpoint(
+    user_id: str = Query(min_length=1, max_length=64),
+    session_id: str = Query(min_length=1, max_length=64),
+    limit: int = Query(default=10, ge=1, le=20),
+    db: Session = Depends(get_db),
+) -> list[RecognitionJobSummary]:
+    """Return recent recognition transcripts belonging to the active user session."""
+    require_active_session(db, user_id, session_id)
+    records = (
+        db.query(RecognitionJob)
+        .filter(RecognitionJob.user_id == user_id, RecognitionJob.session_id == session_id)
+        .order_by(RecognitionJob.created_at.desc())
+        .limit(limit)
+        .all()
+    )
+    return [
+        RecognitionJobSummary(
+            job_id=record.id,
+            status=record.status,
+            original_filename=record.original_filename,
+            image_sha256=record.image_sha256,
+            model_id=record.model_id,
+            lines_recognized=record.lines_recognized,
+            transcript=record.transcript,
+            created_at=record.created_at,
+        )
+        for record in records
+    ]
 
 
 @app.post("/sessions", response_model=SessionResponse)
