@@ -58,6 +58,10 @@ class GenerationResponse(BaseModel):
     generation_id: str
     status: str
     provenance_digest: str
+    model_id: str
+    image_url: str
+    words_generated: int
+    reference_words_used: int
 
 
 class ProvenanceResponse(BaseModel):
