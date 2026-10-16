@@ -1,15 +1,17 @@
 import hashlib
 import json
+from io import BytesIO
 from pathlib import Path
 from uuid import uuid4
 
 from fastapi import Depends, FastAPI, File, Form, HTTPException, Query, UploadFile, status
 from fastapi.middleware.cors import CORSMiddleware
+from PIL import Image, UnidentifiedImageError
 from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.database import Base, engine, get_db
-from app.models import AuditEvent, Generation, RecognitionJob
+from app.models import AuditEvent, Generation, RecognitionJob, Style, StyleSample
 from app.schemas import (
     AuthorizationRequest,
     AuthorizationResponse,
@@ -23,6 +25,7 @@ from app.schemas import (
     SessionResponse,
     StyleCreateRequest,
     StyleResponse,
+    StyleSampleSummary,
 )
 from app.security.authorization import consume_authorization, issue_authorization
 from app.security.sessions import create_session, require_active_session
@@ -54,7 +57,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origin_list,
     allow_credentials=False,
-    allow_methods=["GET", "POST"],
+    allow_methods=["GET", "POST", "DELETE"],
     allow_headers=["Content-Type"],
 )
 
@@ -270,6 +273,197 @@ def create_style_endpoint(
         status=style.status,
         representation_version=style.representation_version,
     )
+
+
+def _validate_reference_image(
+    image_bytes: bytes, content_type: str, filename: str
+) -> tuple[str, str]:
+    allowed = {
+        "image/png": "PNG",
+        "image/jpeg": "JPEG",
+        "image/webp": "WEBP",
+    }
+    if content_type.lower() not in allowed:
+        raise HTTPException(
+            status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+            detail="Use a PNG, JPEG, or WEBP handwriting sample.",
+        )
+    try:
+        with Image.open(BytesIO(image_bytes)) as image:
+            image_format = (image.format or "").upper()
+            if image_format != allowed[content_type.lower()]:
+                raise HTTPException(
+                    status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+                    detail="The file contents do not match the declared image type.",
+                )
+            if image.width < 32 or image.height < 16:
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail="The handwriting image is too small.",
+                )
+            if image.width * image.height > 12_000_000:
+                raise HTTPException(
+                    status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                    detail="Image is too large. The limit is 12 megapixels.",
+                )
+            image.verify()
+    except HTTPException:
+        raise
+    except (OSError, ValueError, UnidentifiedImageError) as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="The uploaded file is not a readable PNG, JPEG, or WEBP image.",
+        ) from exc
+
+    safe_name = Path((filename or "handwriting-sample").replace("\\", "/")).name
+    return safe_name[:255] or "handwriting-sample", content_type.lower()
+
+
+@app.post("/styles/{style_id}/samples", response_model=list[StyleSampleSummary])
+def add_style_samples_endpoint(
+    style_id: str,
+    files: list[UploadFile] = File(...),
+    user_id: str = Form(min_length=1, max_length=64),
+    session_id: str = Form(min_length=1, max_length=64),
+    db: Session = Depends(get_db),
+) -> list[StyleSampleSummary]:
+    """Persist up to five reference images for one active, session-owned style."""
+    require_active_session(db, user_id, session_id)
+    style = db.get(Style, style_id)
+    if style is None or style.user_id != user_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Style not found.")
+    if style.session_id != session_id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Style does not belong to this session.")
+    if style.status != "ACTIVE":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Style is not active.")
+    if not files:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Choose at least one handwriting sample.")
+    existing_count = db.query(StyleSample).filter(StyleSample.style_id == style_id).count()
+    if existing_count + len(files) > 5:
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail=f"This prototype stores up to five reference images per style. {existing_count} are already saved.",
+        )
+
+    prepared: list[tuple[str, str, str, bytes]] = []
+    try:
+        for upload in files:
+            image_bytes = upload.file.read(MAX_RECOGNITION_UPLOAD_BYTES + 1)
+            if not image_bytes:
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="A selected image is empty.")
+            if len(image_bytes) > MAX_RECOGNITION_UPLOAD_BYTES:
+                raise HTTPException(
+                    status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                    detail="Each reference image must be 8 MB or smaller.",
+                )
+            safe_name, content_type = _validate_reference_image(
+                image_bytes, upload.content_type or "", upload.filename or "handwriting-sample"
+            )
+            prepared.append((safe_name, content_type, hashlib.sha256(image_bytes).hexdigest(), image_bytes))
+    finally:
+        for upload in files:
+            upload.file.close()
+
+    saved: list[StyleSample] = []
+    for original_filename, content_type, image_digest, image_bytes in prepared:
+        sample = StyleSample(
+            id=f"sample_{uuid4().hex}",
+            style_id=style_id,
+            user_id=user_id,
+            session_id=session_id,
+            original_filename=original_filename,
+            content_type=content_type,
+            image_sha256=image_digest,
+            image_bytes=image_bytes,
+        )
+        db.add(sample)
+        saved.append(sample)
+
+    audit(
+        db, "STYLE_SAMPLES_SAVED", user_id=user_id, session_id=session_id,
+        style_id=style_id,
+        metadata={"count": len(saved), "image_sha256": [sample.image_sha256 for sample in saved]},
+    )
+    db.commit()
+    for sample in saved:
+        db.refresh(sample)
+
+    return [
+        StyleSampleSummary(
+            sample_id=sample.id,
+            style_id=sample.style_id,
+            original_filename=sample.original_filename,
+            content_type=sample.content_type,
+            image_sha256=sample.image_sha256,
+            size_bytes=len(sample.image_bytes),
+            created_at=sample.created_at,
+        )
+        for sample in saved
+    ]
+
+
+@app.get("/styles/{style_id}/samples", response_model=list[StyleSampleSummary])
+def list_style_samples_endpoint(
+    style_id: str,
+    user_id: str = Query(min_length=1, max_length=64),
+    session_id: str = Query(min_length=1, max_length=64),
+    db: Session = Depends(get_db),
+) -> list[StyleSampleSummary]:
+    require_active_session(db, user_id, session_id)
+    style = db.get(Style, style_id)
+    if style is None or style.user_id != user_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Style not found.")
+    if style.session_id != session_id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Style does not belong to this session.")
+    records = (
+        db.query(StyleSample)
+        .filter(
+            StyleSample.style_id == style_id,
+            StyleSample.user_id == user_id,
+            StyleSample.session_id == session_id,
+        )
+        .order_by(StyleSample.created_at.asc())
+        .all()
+    )
+    return [
+        StyleSampleSummary(
+            sample_id=record.id,
+            style_id=record.style_id,
+            original_filename=record.original_filename,
+            content_type=record.content_type,
+            image_sha256=record.image_sha256,
+            size_bytes=len(record.image_bytes),
+            created_at=record.created_at,
+        )
+        for record in records
+    ]
+
+
+@app.delete("/styles/{style_id}/samples/{sample_id}", response_model=MessageResponse)
+def delete_style_sample_endpoint(
+    style_id: str,
+    sample_id: str,
+    user_id: str = Query(min_length=1, max_length=64),
+    session_id: str = Query(min_length=1, max_length=64),
+    db: Session = Depends(get_db),
+) -> MessageResponse:
+    require_active_session(db, user_id, session_id)
+    style = db.get(Style, style_id)
+    if style is None or style.user_id != user_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Style not found.")
+    if style.session_id != session_id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Style does not belong to this session.")
+    sample = db.get(StyleSample, sample_id)
+    if sample is None or sample.style_id != style_id or sample.user_id != user_id or sample.session_id != session_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Style sample not found.")
+    digest = sample.image_sha256
+    db.delete(sample)
+    audit(
+        db, "STYLE_SAMPLE_DELETED", user_id=user_id, session_id=session_id, style_id=style_id,
+        metadata={"sample_id": sample_id, "image_sha256": digest},
+    )
+    db.commit()
+    return MessageResponse(message="Handwriting sample deleted.")
 
 
 @app.post("/authorize", response_model=AuthorizationResponse)
